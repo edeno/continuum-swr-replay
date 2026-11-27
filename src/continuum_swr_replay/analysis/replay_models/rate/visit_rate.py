@@ -109,7 +109,13 @@ from continuum_swr_replay.analysis.regression.terms import (
 )
 from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns, unit_key
 
-from ..declared_tests import BASELINES, CoefficientContrast, CurveContrast, estimand
+from ..declared_tests import (
+    BASELINES,
+    CoefficientContrast,
+    CurveContrast,
+    OutcomeWindowContrast,
+    estimand,
+)
 from ..fit_by import BEHAVIOR_FIT_BY
 from ..visit_design import EVENT_KINDS, REWARD_LAG_COLUMNS, visit_timebins
 
@@ -125,6 +131,9 @@ __all__ = [
     "MODEL_NAMES",
     "Q1_REFERENCE_WINDOWS",
     "RATE_ESTIMANDS",
+    "SECONDARY_ESTIMAND",
+    "OMITTED_ARRIVAL_TERM",
+    "ARRIVAL_BY_OUTCOME",
     "RESPONSE",
     "REWARDED_ARRIVAL_TERM",
     "REWARD",
@@ -153,6 +162,7 @@ __all__ = [
     "model_terms",
     "require_declared_penalized",
     "tested_terms",
+    "window_contrast",
     "third_clock_decision",
 ]
 
@@ -180,8 +190,14 @@ MODELS: tuple[str, ...] = ("A", "D")
 MODEL_NAMES: dict[str, str] = {"A": "visit_rate_A", "D": "visit_rate_D"}
 
 #: The declared estimands this model answers (``declared_tests``), all read
-#: from model A.
-RATE_ESTIMANDS: tuple[str, ...] = ("Q1", "Q2", "Q7a")
+#: from model A's by-outcome form.
+RATE_ESTIMANDS: tuple[str, ...] = ("Q1", "Q2", "Q2-onset", "Q7a")
+
+#: The secondary value, read from model A's coefficient form: the one reward
+#: coefficient (the twenty-sixth round: kept for comparison with other
+#: studies, described as mixing the timing with the rate; not a declared
+#: test).
+SECONDARY_ESTIMAND = "reward_coefficient"
 
 # --- The bases -------------------------------------------------------------
 
@@ -207,9 +223,13 @@ def _smooth_name(column: str) -> str:
     return f"s({column})"
 
 
-#: The term of the reward effect's own arrival curve (the time-varying form):
-#: the arrival smooth fitted on the rows after a reward.
+#: The arrival curve after an omission, of the by-outcome reward form: the
+#: arrival smooth fitted on the rows whose last outcome was omitted.
+OMITTED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=0"
+#: The arrival curve after a reward, of the by-outcome reward form.
 REWARDED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=1"
+#: The two arrival curves of the by-outcome form, by last outcome.
+ARRIVAL_BY_OUTCOME: dict[int, str] = {0: OMITTED_ARRIVAL_TERM, 1: REWARDED_ARRIVAL_TERM}
 
 # --- OPEN (lead): the settings of the model's form --------------------------
 #
@@ -247,9 +267,9 @@ CLOCK_PENALTY_SETTINGS: tuple[str, ...] = ("declared", "stiffer", "looser")
 #: by ``VisitRateSettings.calibrated_penalties`` with its target and rows;
 #: :func:`fit_visit_rate` refuses these values unless the fit is a test or a
 #: simulation. The stretch clock takes the leaving clock's values (the same
-#: knot spacing); model D's lag curve is 2, with 4 and 0 either side; the
-#: rewarded arrival curve of the time-varying reward form takes the arrival
-#: clock's value.
+#: knot spacing); model D's lag curve is 2, with 4 and 0 either side; each
+#: arrival curve of the by-outcome reward form takes the arrival clock's
+#: value (:meth:`VisitRateSettings.log_penalty`).
 CLOCK_LOG_PENALTIES: dict[str, dict[str, dict[str, float]]] = {
     "SWR": {
         "declared": {ARRIVAL: 1.0522, LEAVING: 3.0718, STRETCH: 3.0718, LAG_TERM: 2.0},
@@ -280,33 +300,26 @@ PROVISIONAL_USES: tuple[str, ...] = ("test", "simulation")
 #: leaving the cap removes (:func:`cohort_rows`).
 TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 
-#: DECIDED (lead, 2026-11-25), NOT YET BUILT: the reward effect is read from
-#: an arrival curve for each outcome, each penalized on its own (``outcome +
-#: s(arrival, by = outcome)``), with the leaving curve shared by both
-#: outcomes; two declared window contrasts (the outcome term plus the mean
-#: over the window of the rewarded arrival curve minus the omitted one): Q2
-#: over 4 to 10 s after arrival, and the onset over 2 to 4 s. The one
-#: coefficient stays as a secondary value. That form replaces
-#: ``"time_varying"`` below (a shared curve plus a difference curve, read
-#: over the rewarded rows) when it is built.
-#:
-#: The forms built today. ``"coefficient"`` (the default, the declared Q2
-#: until the decided form is built): one coefficient, and one arrival curve
-#: for both outcomes. ``"time_varying"``: the same coefficient and a second arrival
-#: curve for the rows after a reward (a smooth ``by`` the last outcome,
-#: sum-to-zero over the rewarded rows of the design), so the effect may change
-#: with time since arrival. The form changes the meaning of Q1 as well as of
-#: Q2. Under the coefficient form, where the effect changes with time, the one
-#: arrival curve holds the part of the effect the coefficient cannot (in
-#: proportion to the rewarded share of the events at each time since arrival),
-#: and so does the leaving curve; under the time-varying form the arrival
-#: curve is the curve after an omission, and Q2 is the effect averaged over
-#: the design's rewarded rows (one weight per row). That average reads the
-#: curve after an omission at the rewarded rows' arrival times; where no
-#: omission row has that time, the curve there is the penalty's
-#: extrapolation. ``visit_rate_scenarios`` gives the truth of each form. An
-#: option to build and test, not the declared test.
-REWARD_FORMS: tuple[str, ...] = ("coefficient", "time_varying")
+#: DECIDED (lead, 2026-11-25, the convention's twenty-sixth round): the form of
+#: the reward effect. ``"by_outcome"`` (the default, the declared form): an
+#: arrival curve for each last outcome, each a smooth ``by`` the outcome with
+#: its own sum-to-zero constraint (on the pooled rows of its outcome) and its
+#: own declared penalty, the outcome coefficient (the weak penalty) and the
+#: leaving curve (and the stretch curve) shared by both outcomes: ``outcome +
+#: session + s(arrival, by = outcome) + s(leaving) + offset(log exposure)``.
+#: The outcome coefficient and the two centered curves identify the
+#: difference curve ``beta + f_1(s) - f_0(s)`` (the log rate ratio after a
+#: reward at time ``s`` since arrival, at the same time before leaving), so
+#: the reward effect may change with time since arrival, and only along it.
+#: Q2 and the onset test are its mean over declared windows, Q1 is read from
+#: the arrival curve after an omission (``declared_tests``).
+#: ``"coefficient"``: one arrival curve for both outcomes and one reward
+#: coefficient. Its coefficient is the SECONDARY value
+#: (:data:`SECONDARY_ESTIMAND`), for comparison with other studies: where
+#: the effect changes with time since arrival it mixes the timing with the
+#: rate. The form of a shared curve plus a difference curve
+#: (``"time_varying"``) was decided against (the same round) and removed.
+REWARD_FORMS: tuple[str, ...] = ("by_outcome", "coefficient")
 
 #: OPEN (lead): the reference window of Q1 (s since arrival). ``(0, 1)`` is
 #: the declared one (``declared_tests``, the default); ``(1, 2)`` the
@@ -355,9 +368,9 @@ class VisitRateSettings:
     max_time_since_arrival_s : float or None
         :data:`TIME_RANGE_CAPS_S`. With a cap, Q7a is read only from the
         visits that end before it (see there).
-    reward_form : {"coefficient", "time_varying"}
-        :data:`REWARD_FORMS`. The time-varying form changes what Q1 means (the
-        arrival curve becomes the curve after an omission) as well as Q2.
+    reward_form : {"by_outcome", "coefficient"}
+        :data:`REWARD_FORMS`: the declared form (an arrival curve for each
+        outcome) or the secondary one (one coefficient).
     q1_reference_s : tuple of float
         :data:`Q1_REFERENCE_WINDOWS`.
     include_stretch_clock : bool
@@ -388,7 +401,7 @@ class VisitRateSettings:
     weak_prior_sd: float = WEAK_PRIOR_SD
     clock_penalty: Literal["declared", "stiffer", "looser"] = "declared"
     max_time_since_arrival_s: float | None = None
-    reward_form: Literal["coefficient", "time_varying"] = "coefficient"
+    reward_form: Literal["by_outcome", "coefficient"] = "by_outcome"
     q1_reference_s: tuple[float, float] = (0.0, 1.0)
     include_stretch_clock: bool = True
     fit_by: FitBy = BEHAVIOR_FIT_BY[0]
@@ -423,18 +436,29 @@ class VisitRateSettings:
         return log_penalty_from_prior_sd(self.weak_prior_sd)
 
     def log_penalty(self, kind: str, curve: str) -> float:
-        """The log penalty of one curve (a clock column or :data:`LAG_TERM`)."""
+        """The log penalty of one curve (a clock column, an arrival curve of
+        :data:`ARRIVAL_BY_OUTCOME` or :data:`LAG_TERM`). Each curve has its
+        own; in :data:`CLOCK_LOG_PENALTIES` an arrival curve by outcome takes
+        the arrival clock's value."""
         if self.log_penalties is not None and curve in self.log_penalties:
             return float(self.log_penalties[curve])
         calibrated = self.calibrated_penalties or {}
         if (_kind(kind), curve) in calibrated:
             return float(calibrated[(kind, curve)].log_penalty)
-        return CLOCK_LOG_PENALTIES[kind][self.clock_penalty][curve]
+        table = ARRIVAL if curve in ARRIVAL_BY_OUTCOME.values() else curve
+        return CLOCK_LOG_PENALTIES[kind][self.clock_penalty][table]
 
     def curves(self, model: str) -> tuple[str, ...]:
         """The curves of a model whose log penalty this setting gives: the
-        clocks and, for model D, :data:`LAG_TERM`."""
-        return (*self.clocks(), *((LAG_TERM,) if _model(model) == "D" else ()))
+        clocks (model A's by-outcome form: the two arrival curves,
+        :data:`ARRIVAL_BY_OUTCOME`, in place of the arrival clock) and, for
+        model D, :data:`LAG_TERM`."""
+        if _model(model) == "D":
+            return (*self.clocks(), LAG_TERM)
+        clocks = self.clocks()
+        if self.reward_form == "by_outcome":
+            return (*ARRIVAL_BY_OUTCOME.values(), *clocks[1:])
+        return clocks
 
     def provisional_curves(self, model: str, kind: str) -> tuple[str, ...]:
         """The model's curves whose log penalty has no calibration record:
@@ -475,11 +499,19 @@ def _model(model: str) -> str:
 
 
 def _clock_smooth(
-    clock: str, kind: str, settings: VisitRateSettings, **by: object
+    clock: str, kind: str, settings: VisitRateSettings, curve: str | None = None, **by
 ) -> Smooth:
+    """A clock's smooth at the log penalty of ``curve`` (the clock's own by
+    default)."""
     lo, hi = settings.clock_range(clock)
     basis = PSplineBasis.from_spacing(lo, hi, CLOCK_BASES[clock][2])
-    return Smooth(clock, lo, hi, basis.n_basis, settings.log_penalty(kind, clock), **by)
+    penalty = settings.log_penalty(kind, curve or clock)
+    return Smooth(clock, lo, hi, basis.n_basis, penalty, **by)
+
+
+#: The last outcome as the ``by`` of the by-outcome form's arrival curves (a
+#: category used only as a ``by``, so not a term: its penalty is not read).
+_OUTCOME = Category(REWARD, (0, 1), 0, "none")
 
 
 def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term]:
@@ -494,21 +526,25 @@ def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term
     Returns
     -------
     list of terms
-        The offset, the clock smooths, then model A's reward slope (and, in
-        the time-varying form, the rewarded rows' arrival smooth) or model
-        D's lag curve. The intercept is the design's, unpenalized.
+        The offset, the arrival curves (model A's by-outcome form: one for
+        each last outcome, :data:`ARRIVAL_BY_OUTCOME`, each at its own
+        penalty; else one), the other clock smooths, then model A's reward
+        coefficient or model D's lag curve. The intercept is the design's,
+        unpenalized: the baseline.
     """
     _model(model)
     _kind(kind)
     terms: list[Term] = [Offset(EXPOSURE)]
-    terms += [_clock_smooth(clock, kind, settings) for clock in settings.clocks()]
+    if model == "A" and settings.reward_form == "by_outcome":
+        terms += [
+            _clock_smooth(ARRIVAL, kind, settings, term, by=_OUTCOME, levels=(level,))
+            for level, term in ARRIVAL_BY_OUTCOME.items()
+        ]
+    else:
+        terms.append(_clock_smooth(ARRIVAL, kind, settings))
+    terms += [_clock_smooth(clock, kind, settings) for clock in settings.clocks()[1:]]
     if model == "A":
         terms.append(Slope(REWARD, settings.weak_log_penalty))
-        if settings.reward_form == "time_varying":
-            outcome = Category(REWARD, (0, 1), 0, "none")
-            terms.append(
-                _clock_smooth(ARRIVAL, kind, settings, by=outcome, levels=(1,))
-            )
     else:
         terms.append(
             LinearFunctional(
@@ -525,15 +561,16 @@ def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term
 
 def tested_terms(model: str, settings: VisitRateSettings) -> tuple[str, ...]:
     """The terms and coefficients the model's estimands read: model A's
-    declared tests (Q1, Q7a: the clock smooths; Q2: the reward coefficient,
-    and the rewarded arrival curve in the time-varying form); model D's lag
-    curve (described, not tested)."""
+    by-outcome form, its declared tests (Q1: the arrival curve after an
+    omission; Q2 and the onset test: the reward coefficient and both arrival
+    curves; Q7a: the leaving curve); model A's coefficient form, its
+    secondary value (the reward coefficient); model D's lag curve
+    (described, not tested)."""
     if _model(model) == "D":
         return (LAG_TERM,)
-    out = [_smooth_name(ARRIVAL), _smooth_name(LEAVING), REWARD]
-    if settings.reward_form == "time_varying":
-        out.append(REWARDED_ARRIVAL_TERM)
-    return tuple(out)
+    if settings.reward_form == "by_outcome":
+        return (*ARRIVAL_BY_OUTCOME.values(), _smooth_name(LEAVING), REWARD)
+    return (REWARD,)
 
 
 def require_declared_penalized(
@@ -638,17 +675,47 @@ def lag_curve_rows(design: Design) -> np.ndarray:
     return out
 
 
+def window_contrast(design: Design, contrast: OutcomeWindowContrast) -> np.ndarray:
+    """The ``c`` of an outcome window contrast (``declared_tests``): the
+    outcome coefficient plus the mean over the window, on
+    ``contrasts.range_grid``, of the rewarded arrival curve less the omitted
+    one.
+
+    Raises
+    ------
+    ValueError
+        If the window lies outside a curve's basis range (beyond it a clamped
+        smooth is flat), or the design lacks a term or the coefficient.
+    """
+    basis = design.basis_record()
+    grid = contrasts.range_grid(*contrast.window)
+    c = contrasts.coefficient_contrast(design.coef_names, (contrast.coefficient,))
+    for term, sign in ((contrast.plus_term, 1.0), (contrast.minus_term, -1.0)):
+        if term not in design.by_name:
+            raise ValueError(f"{term!r} is not in the design")
+        lo, hi = basis[term]["range"]
+        a, b = contrast.window
+        if a < lo - 1e-9 * (hi - lo) or b > hi + 1e-9 * (hi - lo):
+            raise ValueError(
+                f"the window [{a}, {b}] lies outside the term's range [{lo}, {hi}]"
+            )
+        c = c + sign * curve_rows(design, term)(grid).mean(axis=0)
+    return c
+
+
 def declared_contrasts(
     design: Design, settings: VisitRateSettings
 ) -> dict[str, np.ndarray]:
-    """The ``c`` of each declared estimand of the model (Q1, Q2, Q7a), on
-    model A's design.
+    """The ``c`` of each estimand of model A's form.
 
-    Each is read from ``declared_tests``; Q1's reference window is the
-    setting's (the declared ``(0, 1)`` by default). A curve contrast is the
-    range mean of its smooth over the contrast's ranges
-    (``contrasts.range_mean_contrast``), which must lie inside the term's
-    basis range; a coefficient contrast names coefficients of the design.
+    The by-outcome form gives the declared estimands (:data:`RATE_ESTIMANDS`:
+    Q1, Q2, Q2-onset, Q7a), each read from ``declared_tests``; Q1's
+    reference window is the setting's (the declared ``(0, 1)`` by default).
+    A curve contrast is the range mean of its smooth over the contrast's
+    ranges (``contrasts.range_mean_contrast``), which must lie inside the
+    term's basis range; an outcome window contrast is
+    :func:`window_contrast`. The coefficient form gives the secondary value
+    alone (:data:`SECONDARY_ESTIMAND`, the reward coefficient).
 
     Returns
     -------
@@ -661,6 +728,12 @@ def declared_contrasts(
         If a declared estimand is not of model A, or names a term or a
         coefficient the design lacks.
     """
+    if settings.reward_form == "coefficient":
+        return {
+            SECONDARY_ESTIMAND: contrasts.coefficient_contrast(
+                design.coef_names, (REWARD,)
+            )
+        }
     out = {}
     basis = design.basis_record()
     for estimand_id in RATE_ESTIMANDS:
@@ -681,6 +754,8 @@ def declared_contrasts(
                 contrast.second,
                 term_range=tuple(basis[contrast.term]["range"]),
             )
+        elif isinstance(contrast, OutcomeWindowContrast):
+            out[estimand_id] = window_contrast(design, contrast)
         elif isinstance(contrast, CoefficientContrast):
             out[estimand_id] = contrasts.coefficient_contrast(
                 design.coef_names, contrast.plus, contrast.minus
@@ -1107,7 +1182,9 @@ def calibrate_log_penalty(
     model : {"A", "D"}
     kind : {"SWR", "No SWR"}
     curve : str
-        A clock column of the model, or :data:`LAG_TERM` for model D.
+        A curve of :meth:`VisitRateSettings.curves`: a clock column, an
+        arrival curve of :data:`ARRIVAL_BY_OUTCOME`, or :data:`LAG_TERM` for
+        model D.
     target_edf : float
     settings : VisitRateSettings
 
@@ -1118,7 +1195,8 @@ def calibrate_log_penalty(
     sessions, _ = _unit_rows(cohort, _model(model), _kind(kind), settings.fit_by)
     pooled = pd.concat(list(sessions.values()), ignore_index=True)
     design = build_visit_rate_design(model, kind, pooled, settings)
-    term = curve if curve == LAG_TERM else _smooth_name(curve)
+    named = (LAG_TERM, *ARRIVAL_BY_OUTCOME.values())
+    term = curve if curve in named else _smooth_name(curve)
     return log_penalty_for_edf(
         design,
         sessions,

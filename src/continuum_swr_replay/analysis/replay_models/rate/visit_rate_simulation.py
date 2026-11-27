@@ -607,11 +607,8 @@ def _session_planted(
         )
         out[name] = {
             "expected": planted.expected,
-            "pooled": {**planted.pooled, "Q1b": later.pooled["Q1"]},
-            "omission_side": {
-                **planted.omission_side,
-                "Q1b": later.omission_side["Q1"],
-            },
+            "pooled": dict(planted.pooled),
+            "by_outcome": {**planted.by_outcome, "Q1b": later.by_outcome["Q1"]},
         }
     return out
 
@@ -657,14 +654,12 @@ def _planted_of(model: Model, *, values: Mapping[str, float]) -> float:
 
 
 def _estimands(design, settings: vr.VisitRateSettings) -> dict[str, np.ndarray]:
-    """Q1 (declared window), Q1b (1 to 2 s), Q2 (at the session level) and
-    Q7a on a design."""
+    """The declared estimands of the by-outcome form on a design (Q1 at the
+    declared reference window, Q2, Q2-onset, Q7a) and Q1b (Q1 against 1 to 2
+    s)."""
     c = vr.declared_contrasts(design, replace(settings, q1_reference_s=(0.0, 1.0)))
     later = vr.declared_contrasts(design, replace(settings, q1_reference_s=(1.0, 2.0)))
-    out = {"Q1": c["Q1"], "Q1b": later["Q1"], "Q7a": c["Q7a"]}
-    if "Q2" in c:
-        out["Q2"] = c["Q2"]
-    return out
+    return {**c, "Q1b": later["Q1"]}
 
 
 def _models(
@@ -914,22 +909,19 @@ def simulation(
     for name in names:
         by_session = {key: planted[key][name] for key in sessions}
         truth = {
-            "session": {
-                e: _balanced({k: v["pooled"][e] for k, v in by_session.items()})
-                for e in ("Q1", "Q1b", "Q2", "Q7a")
-            },
-            "omission_side": {
-                e: _balanced({k: v["omission_side"][e] for k, v in by_session.items()})
-                for e in ("Q1", "Q1b", "Q2", "Q7a")
-            },
+            form: {
+                e: _balanced({k: v[form][e] for k, v in by_session.items()})
+                for e in next(iter(by_session.values()))[form]
+            }
+            for form in ("by_outcome", "pooled")
         }
         truths[name] = truth
         planted_values = {
             e: partial(
                 _planted_of,
-                values={m.name: truth["session"][e] for m in models},
+                values={m.name: truth["by_outcome"][e] for m in models},
             )
-            for e in ("Q1", "Q1b", "Q2", "Q7a")
+            for e in truth["by_outcome"]
         }
         scenarios.append(
             OutsideScenario(
@@ -1003,9 +995,9 @@ def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
         for m in out["model"]
     ]
     out["truth_from_real_counts"] = out["scenario"].isin(TRUTH_FROM_REAL_COUNTS)
-    for name in ("session", "omission_side"):
+    for name in ("by_outcome", "pooled"):
         out[f"truth_{name}"] = [
-            truths[s][name][e]
+            truths[s][name].get(e, np.nan)
             for s, e in zip(out["scenario"], out["estimand"], strict=True)
         ]
     return out

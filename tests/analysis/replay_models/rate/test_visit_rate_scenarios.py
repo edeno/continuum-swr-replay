@@ -23,16 +23,25 @@ def rows(make_visit_rows) -> pd.DataFrame:
     return make_visit_rows(KEY, n_visits=40, seed=3, length_s=(1.5, 12.0))
 
 
+COEF = vr.SECONDARY_ESTIMAND
+
+
+def _windows(value: float) -> dict[str, float]:
+    return {"Q2": value, "Q2-onset": value}
+
+
 def test_planted_curve_values_are_the_hand_values(rows) -> None:
     planted = scenarios.no_effect(rows, LINEAR)
-    hand = {"Q1": 1.0, "Q2": 0.0, "Q7a": 2.75}
-    for form in vr.REWARD_FORMS:
-        assert planted.for_form(form) == pytest.approx(hand, abs=1e-9)
+    assert planted.by_outcome == pytest.approx(
+        {"Q1": 1.0, "Q7a": 2.75, **_windows(0.0)}, abs=1e-9
+    )
+    assert planted.pooled == pytest.approx({COEF: 0.0}, abs=1e-9)
     assert planted.for_form("coefficient") is planted.pooled
-    assert planted.for_form("time_varying") is planted.omission_side
+    assert planted.for_form("by_outcome") is planted.by_outcome
+    with pytest.raises(ValueError, match="time_varying"):
+        planted.for_form("time_varying")
     later = scenarios.no_effect(rows, LINEAR, q1_reference_s=(1.0, 2.0))
-    assert later.pooled["Q1"] == pytest.approx(0.4 * (3.0 - 1.5))
-    assert later.omission_side["Q1"] == pytest.approx(0.4 * (3.0 - 1.5))
+    assert later.by_outcome["Q1"] == pytest.approx(0.4 * (3.0 - 1.5))
     s, u = rows[vr.ARRIVAL].to_numpy(), rows[vr.LEAVING].to_numpy()
     expected = rows[vr.EXPOSURE].to_numpy() * np.exp(0.4 * s - 2.0 * u)
     assert planted.expected == pytest.approx(expected)
@@ -42,9 +51,11 @@ def test_a_constant_ratio_and_the_session_total(rows) -> None:
     planted = scenarios.constant_ratio(rows, LINEAR, log_ratio=0.5, total=250.0)
     base = scenarios.no_effect(rows, LINEAR, total=250.0)
     assert planted.expected.sum() == pytest.approx(250.0)
-    # A constant effect is exactly the shared form: the truths agree.
-    for truth in (planted.pooled, planted.omission_side):
-        assert truth == pytest.approx({"Q1": 1.0, "Q2": 0.5, "Q7a": 2.75}, abs=1e-9)
+    # A constant effect is the same in every window and is the coefficient.
+    assert planted.by_outcome == pytest.approx(
+        {"Q1": 1.0, "Q7a": 2.75, **_windows(0.5)}, abs=1e-9
+    )
+    assert planted.pooled == pytest.approx({COEF: 0.5}, abs=1e-9)
     ratio = planted.expected / base.expected
     rewarded = rows[vr.REWARD].to_numpy() == 1.0
     assert np.ptp(ratio[rewarded]) == pytest.approx(0.0, abs=1e-12)
@@ -61,12 +72,11 @@ def test_a_stretch_curve_enters_the_rate(rows) -> None:
 
 
 def test_a_fading_ratio(rows) -> None:
-    """``g`` is the full log ratio before the fade, 0 after it. The
-    time-varying form's Q2 is the mean of ``g`` over the rewarded rows; its
-    Q1 and Q7a are the omission side's curves'. The pooled arrival curve takes
-    part of the effect, which is larger in the first second than 2 to 4 s
-    after arrival, so pooled Q1 is below the omission side's; with no bin in
-    the fade both truths are the full ratio and the curves'."""
+    """``g`` is the full log ratio before the fade, 0 after it. The window
+    truths are the plain means of ``g`` over each window's grid (the fade
+    from 3 to 6 s: 0.8 * mean(clip((6 - s) / 3, 0, 1))); Q1 and Q7a are the
+    omission side's curves'. The coefficient's projection lies between 0 and
+    the full ratio; with no bin in the fade every truth is the full ratio."""
     planted = scenarios.fading_ratio(
         rows, LINEAR, log_ratio=0.8, fade_start_s=3.0, fade_end_s=6.0
     )
@@ -77,16 +87,21 @@ def test_a_fading_ratio(rows) -> None:
     assert g[rewarded & (s <= 3.0)] == pytest.approx(0.8)
     assert g[rewarded & (s >= 6.0)] == pytest.approx(0.0, abs=1e-12)
     assert g[~rewarded] == pytest.approx(0.0, abs=1e-12)
-    assert planted.omission_side["Q2"] == pytest.approx(np.mean(g[rewarded]))
-    assert planted.omission_side["Q1"] == pytest.approx(1.0)
-    assert planted.omission_side["Q7a"] == pytest.approx(2.75)
-    assert 0.0 < planted.pooled["Q2"] < 0.8
-    assert planted.pooled["Q1"] < planted.omission_side["Q1"] - 0.02
+    for name, (lo, hi) in (("Q2", (4.0, 10.0)), ("Q2-onset", (2.0, 4.0))):
+        grid = np.linspace(lo, hi, round((hi - lo) * 100) + 1)
+        hand = 0.8 * np.mean(np.clip((6.0 - grid) / 3.0, 0.0, 1.0))
+        assert planted.by_outcome[name] == pytest.approx(hand)
+    assert planted.by_outcome["Q2"] < planted.by_outcome["Q2-onset"] < 0.8
+    assert planted.by_outcome["Q1"] == pytest.approx(1.0)
+    assert planted.by_outcome["Q7a"] == pytest.approx(2.75)
+    assert 0.0 < planted.pooled[COEF] < 0.8
     never = scenarios.fading_ratio(
         rows, LINEAR, log_ratio=0.8, fade_start_s=50.0, fade_end_s=60.0
     )
-    for truth in (never.pooled, never.omission_side):
-        assert truth == pytest.approx({"Q1": 1.0, "Q2": 0.8, "Q7a": 2.75}, abs=1e-9)
+    assert never.by_outcome == pytest.approx(
+        {"Q1": 1.0, "Q7a": 2.75, **_windows(0.8)}, abs=1e-9
+    )
+    assert never.pooled == pytest.approx({COEF: 0.8}, abs=1e-9)
 
 
 def test_a_ratio_that_differs_between_sessions_and_animals(make_visit_rows) -> None:
@@ -104,8 +119,8 @@ def test_a_ratio_that_differs_between_sessions_and_animals(make_visit_rows) -> N
     key = ("rat2", "20200103", "02_r1")
     rows = make_visit_rows(key, n_visits=20, seed=1)
     planted = scenarios.differing_ratio(rows, LINEAR, log_ratios=ratios)
-    assert planted.omission_side["Q2"] == pytest.approx(ratios[key])
-    assert planted.pooled["Q2"] == pytest.approx(ratios[key])
+    assert planted.by_outcome["Q2"] == pytest.approx(ratios[key])
+    assert planted.pooled[COEF] == pytest.approx(ratios[key])
     constant = scenarios.constant_ratio(rows, LINEAR, log_ratio=ratios[key])
     assert planted.expected == pytest.approx(constant.expected)
 
@@ -120,16 +135,18 @@ def test_a_later_onset_after_an_omission(rows) -> None:
     assert planted.expected[~rewarded] == pytest.approx(
         base[~rewarded] * np.exp(shift[~rewarded])
     )
-    for truth in (planted.pooled, planted.omission_side):
-        assert np.isnan(truth["Q2"])
+    # No ratio is planted: the coefficient has no truth. The window truths
+    # are the means of g(s) = 0.4 * (s - max(s - 0.5, 0)), 0.2 from 0.5 s on.
+    assert np.isnan(planted.pooled[COEF])
+    assert planted.by_outcome["Q2"] == pytest.approx(0.2)
+    assert planted.by_outcome["Q2-onset"] == pytest.approx(0.2)
     # The omission side's arrival curve is the delayed one: 0.4 * max(s -
     # 0.5, 0) has mean 0.4 * 2.5 over [2, 4] and 0.4 * 0.125 over [0, 1]
     # (the line from 0.5 to 1, half the window), on the 0.01 s grid.
     grid = np.linspace(0.0, 1.0, 101)
     reference = 0.4 * np.mean(np.maximum(grid - 0.5, 0.0))
-    assert planted.omission_side["Q1"] == pytest.approx(0.4 * 2.5 - reference)
-    assert planted.omission_side["Q7a"] == pytest.approx(2.75)
-    assert planted.pooled["Q1"] > planted.omission_side["Q1"]
+    assert planted.by_outcome["Q1"] == pytest.approx(0.4 * 2.5 - reference)
+    assert planted.by_outcome["Q7a"] == pytest.approx(2.75)
 
 
 def test_the_drops_before_leaving_and_before_small_movements(rows) -> None:
@@ -151,10 +168,11 @@ def test_the_drops_before_leaving_and_before_small_movements(rows) -> None:
     assert stretch.expected == pytest.approx(
         exposure * np.exp(0.4 * s - 1.2 * (m < 0.3))
     )
-    for truth in (leaving.pooled, leaving.omission_side):
-        assert truth == pytest.approx({"Q1": 1.0, "Q2": 0.0, "Q7a": -1.2}, abs=1e-9)
-    for truth in (stretch.pooled, stretch.omission_side):
-        assert truth == pytest.approx({"Q1": 1.0, "Q2": 0.0, "Q7a": 0.0}, abs=1e-9)
+    for planted, q7a in ((leaving, -1.2), (stretch, 0.0)):
+        assert planted.by_outcome == pytest.approx(
+            {"Q1": 1.0, "Q7a": q7a, **_windows(0.0)}, abs=1e-9
+        )
+        assert planted.pooled == pytest.approx({COEF: 0.0}, abs=1e-9)
 
 
 def _poisson_steps(
@@ -222,23 +240,23 @@ def test_a_rate_table_truth(make_visit_rows) -> None:
         grid = np.arange(round(lo * 100), round(hi * 100) + 1) / 100.0
         return np.mean([steps[(outcome, int(np.floor(x / width)))] for x in grid])
 
-    for by_outcome, truth in ((False, planted.pooled), (True, planted.omission_side)):
-        arrival, leaving, beta = _poisson_steps(
-            rows, expected, by_outcome=by_outcome, **cells
-        )
-        q1 = grid_mean(arrival, 0, 2.0, 4.0, 0.5) - grid_mean(arrival, 0, 0.0, 1.0, 0.5)
-        steps_u = {(0, k): v for k, v in leaving.items()}
-        q7a = grid_mean(steps_u, 0, 0.0, 0.25, 0.1) - grid_mean(
-            steps_u, 0, 1.0, 2.0, 0.1
-        )
-        if by_outcome:
-            rewarded = rows[vr.REWARD].to_numpy() == 1.0
-            cell = np.floor(rows[vr.ARRIVAL].to_numpy()[rewarded] / 0.5).astype(int)
-            q2 = np.mean([arrival[(1, c)] - arrival[(0, c)] for c in cell])
-        else:
-            q2 = beta
-        assert truth == pytest.approx({"Q1": q1, "Q2": q2, "Q7a": q7a}, abs=1e-8)
-    assert planted.pooled["Q1"] != pytest.approx(planted.omission_side["Q1"], abs=1e-3)
+    arrival, leaving, _ = _poisson_steps(rows, expected, by_outcome=True, **cells)
+    q1 = grid_mean(arrival, 0, 2.0, 4.0, 0.5) - grid_mean(arrival, 0, 0.0, 1.0, 0.5)
+    steps_u = {(0, k): v for k, v in leaving.items()}
+    q7a = grid_mean(steps_u, 0, 0.0, 0.25, 0.1) - grid_mean(steps_u, 0, 1.0, 2.0, 0.1)
+    difference = {
+        (1, c): arrival.get((1, c), np.nan) - arrival.get((0, c), np.nan)
+        for c in range(41)
+    }
+    windows = {
+        "Q2": grid_mean(difference, 1, 4.0, 10.0, 0.5),
+        "Q2-onset": grid_mean(difference, 1, 2.0, 4.0, 0.5),
+    }
+    assert planted.by_outcome == pytest.approx(
+        {"Q1": q1, "Q7a": q7a, **windows}, abs=1e-8, nan_ok=True
+    )
+    *_, beta = _poisson_steps(rows, expected, by_outcome=False, **cells)
+    assert planted.pooled == pytest.approx({COEF: beta}, abs=1e-8)
     scaled = scenarios.rate_table_truth(rows, table, total=100.0, **cells)
     assert scaled.expected.sum() == pytest.approx(100.0)
     assert scaled.pooled == pytest.approx(planted.pooled, abs=1e-8)

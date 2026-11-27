@@ -45,22 +45,27 @@ def cohort(make_visit_rows, cohort_of):
     return out
 
 
-def _at_clock(rows: pd.DataFrame, clock: str, lo: float, hi: float) -> pd.DataFrame:
+def _at_clock(
+    rows: pd.DataFrame, clock: str, lo: float, hi: float, rewarded: float = 0.0
+) -> pd.DataFrame:
     """One row of the session repeated at clock values from ``lo`` to ``hi``
-    in steps of 0.01 s, every other column held."""
+    in steps of 0.01 s, the last outcome set to ``rewarded``, every other
+    column held."""
     grid = np.arange(round(lo * 100), round(hi * 100) + 1) / 100.0
     frame = rows.iloc[[0] * grid.size].reset_index(drop=True)
     frame[clock] = grid
+    frame[vr.REWARD] = rewarded
     return frame
 
 
 def test_estimands_are_linear_functionals(cohort) -> None:
-    """Q1 and Q7a are the differences of the mean linear predictor of the
-    full design (``Design.session``) at the clock values of their windows,
-    every other column held, so that every other term cancels; Q2 is the
-    reward coefficient; each variance is ``c' V c`` with ``c`` the same
-    difference of the design rows. The session without an event has no fit
-    and no value."""
+    """Each declared estimand is a difference of mean linear predictors of
+    the full design (``Design.session``), every other column held, so that
+    every other term cancels: Q1 at the clock values of its windows after an
+    omission, Q7a at those of its windows, Q2 and Q2-onset after a reward
+    less after an omission at the same times since arrival over their
+    windows; each variance is ``c' V c``. The session without an event has
+    no fit and no value."""
     fit = vr.fit_visit_rate(
         cohort, model="A", kind="SWR", settings=SETTINGS, allow_provisional="test"
     )
@@ -69,9 +74,11 @@ def test_estimands_are_linear_functionals(cohort) -> None:
         .set_index(["animal", "session_date", "estimand_id"])
         .sort_index()
     )
-    windows = {
-        "Q1": (vr.ARRIVAL, (2.0, 4.0), (0.0, 1.0)),
-        "Q7a": (vr.LEAVING, (0.0, 0.25), (1.0, 2.0)),
+    pairs = {
+        "Q1": ((vr.ARRIVAL, (2.0, 4.0), 0.0), (vr.ARRIVAL, (0.0, 1.0), 0.0)),
+        "Q7a": ((vr.LEAVING, (0.0, 0.25), 0.0), (vr.LEAVING, (1.0, 2.0), 0.0)),
+        "Q2": ((vr.ARRIVAL, (4.0, 10.0), 1.0), (vr.ARRIVAL, (4.0, 10.0), 0.0)),
+        "Q2-onset": ((vr.ARRIVAL, (2.0, 4.0), 1.0), (vr.ARRIVAL, (2.0, 4.0), 0.0)),
     }
     for rows, record in zip(cohort.values(), fit.records, strict=True):
         at = (record.animal, record.session_date)
@@ -82,13 +89,14 @@ def test_estimands_are_linear_functionals(cohort) -> None:
         beta = np.asarray(record.coef)
         vcov = np.asarray(record.vcov)
         session_rows = rows.rows["A"]
-        c = {}
-        for estimand_id, (clock, first, second) in windows.items():
-            X_first, _ = fit.design.session(_at_clock(session_rows, clock, *first))
-            X_second, _ = fit.design.session(_at_clock(session_rows, clock, *second))
-            c[estimand_id] = X_first.mean(axis=0) - X_second.mean(axis=0)
-        c["Q2"] = np.eye(len(beta))[fit.design.coef_names.index(vr.REWARD)]
-        for estimand_id, contrast in c.items():
+        for estimand_id, (first, second) in pairs.items():
+            X_first, _ = fit.design.session(
+                _at_clock(session_rows, first[0], *first[1], first[2])
+            )
+            X_second, _ = fit.design.session(
+                _at_clock(session_rows, second[0], *second[1], second[2])
+            )
+            contrast = X_first.mean(axis=0) - X_second.mean(axis=0)
             row = values.loc[(*at, estimand_id)]
             assert row["estimate"] == pytest.approx(contrast @ beta, rel=1e-9)
             variance = contrast @ vcov @ contrast

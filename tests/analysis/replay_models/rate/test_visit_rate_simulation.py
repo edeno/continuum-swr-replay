@@ -42,14 +42,12 @@ def test_the_quick_list_runs_through_the_engine(quick, quick_result) -> None:
     summary = quick_result.summary
     assert list(dict.fromkeys(summary["scenario"])) == list(vs.SCENARIOS["SWR"])
     assert set(summary["model"]) == {"session_sd2"}
-    assert set(summary["estimand"]) == {"Q1", "Q1b", "Q2", "Q7a"}
+    assert set(summary["estimand"]) == {"Q1", "Q1b", "Q2", "Q2-onset", "Q7a"}
     assert (summary["share_not_converged"] == 0.0).all()
     assert (summary["share_without_value"] == 0.0).all()
     assert (summary["n_data_sets_with_estimate"] == 2).all()
     table = vs.table(quick_result, quick)
-    assert {"kind", "target_edf", "prior_sd", "truth_omission_side"} <= set(
-        table.columns
-    )
+    assert {"kind", "target_edf", "prior_sd", "truth_by_outcome"} <= set(table.columns)
     assert quick.attrs["allow_provisional"] == "simulation"
 
 
@@ -64,15 +62,18 @@ def test_the_same_seed_gives_the_same_table(quick, quick_result) -> None:
 
 
 def test_the_planted_values(quick) -> None:
-    """A constant ratio is the truth of every level; a later onset has no
-    planted ratio; the differing ratios' session truth is the reduction of
-    the sessions' own ratios."""
+    """A constant ratio is the truth of every window and of the coefficient;
+    a later onset has no planted coefficient but real window truths; the
+    differing ratios' truth is the reduction of the sessions' own ratios."""
     truths = quick.attrs["truths"]
     log_ratio = vs.LOG_RATIO["SWR"]
-    for level in ("session", "omission_side"):
-        assert truths["constant_ratio"][level]["Q2"] == pytest.approx(log_ratio)
-        assert truths["no_effect"][level]["Q2"] == 0.0
-        assert np.isnan(truths["later_onset"][level]["Q2"])
+    coef = vr.SECONDARY_ESTIMAND
+    for name, value in (("constant_ratio", log_ratio), ("no_effect", 0.0)):
+        assert truths[name]["pooled"][coef] == pytest.approx(value)
+        for window in ("Q2", "Q2-onset"):
+            assert truths[name]["by_outcome"][window] == pytest.approx(value)
+    assert np.isnan(truths["later_onset"]["pooled"][coef])
+    assert truths["later_onset"]["by_outcome"]["Q2-onset"] > 0.0
     keys = pd.DataFrame(
         list(quick.sessions), columns=["animal", "session_date", "epoch"]
     )
@@ -80,10 +81,10 @@ def test_the_planted_values(quick) -> None:
         keys, mean=log_ratio, animal_sd=0.2, session_sd=0.3, seed=vs.DIFFERING_SEED
     )
     per_animal = pd.Series(ratios).groupby(level=0).mean()
-    assert truths["differing_ratio"]["session"]["Q2"] == pytest.approx(
+    assert truths["differing_ratio"]["by_outcome"]["Q2"] == pytest.approx(
         per_animal.mean()
     )
-    assert truths["drop_before_leaving"]["session"]["Q7a"] == pytest.approx(-vs.DROP)
+    assert truths["drop_before_leaving"]["by_outcome"]["Q7a"] == pytest.approx(-vs.DROP)
 
 
 def test_a_planted_coefficient_inside_the_model_is_recovered() -> None:
@@ -104,7 +105,9 @@ def test_a_planted_coefficient_inside_the_model_is_recovered() -> None:
         "inside", {"(Intercept)": float(np.log(2000.0 / seconds)), vr.REWARD: 0.6}
     )
     outside = OutsideScenario(
-        "outside", _constant, planted={"Q2": 0.6, "Q1": 0.0, "Q1b": 0.0, "Q7a": 0.0}
+        "outside",
+        _constant,
+        planted={"Q2": 0.6, "Q2-onset": 0.6, "Q1": 0.0, "Q1b": 0.0, "Q7a": 0.0},
     )
     result = engine.run(Simulation(models, sessions, [inside, outside], 4, 200, 3))
     table = result.summary.set_index(["scenario", "model", "estimand"])
