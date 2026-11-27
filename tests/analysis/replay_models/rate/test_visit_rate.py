@@ -1238,3 +1238,10 @@ def test_a_units_q2_does_not_depend_on_the_other_units(
         table = unit_estimands(fit).set_index(["animal", "estimand_id"])
         values.append(table.loc[("rat0", "Q2"), "estimate"])
     assert values[0] == pytest.approx(values[1], abs=1e-8)
+
+
+def test_window_support_of_no_reads_is_empty(make_visit_rows) -> None:
+    """``window_support`` with an empty mapping of reads gives an empty result
+    (not the default reads)."""
+    rows = make_visit_rows(("rat", "20200101", "02_r1"), n_visits=20, seed=0)
+    assert vr.window_support([rows], DEFAULT, reads={}) == {}

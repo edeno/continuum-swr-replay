@@ -881,7 +881,9 @@ def window_support(
         entry per part, JSON-ready.
     """
     out = {}
-    for estimand_id, estimand_reads in (reads or window_reads(settings)).items():
+    if reads is None:
+        reads = window_reads(settings)
+    for estimand_id, estimand_reads in reads.items():
         entries = []
         for level, (lo, hi) in estimand_reads:
             for part_lo, part_hi in window_parts(lo, hi):
