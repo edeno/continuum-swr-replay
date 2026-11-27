@@ -2,12 +2,12 @@
 
 Each scenario maps one session's rows of the model (``visit_rate.cohort_rows``:
 the clocks, ``exposure``, ``last_outcome_rewarded``) to the expected count of
-each bin, and gives the planted value of each declared estimand of the model
-(Q1, Q2, Q7a) under it. A scenario draws nothing and fits nothing: a
-simulation draws the counts from the expected ones and runs the real fit.
+each bin, and gives the planted value of each estimand of the model under it.
+A scenario draws nothing and fits nothing: a simulation draws the counts from
+the expected ones and runs the real fit.
 
 In every scenario but the rate table, the log rate of a bin is ``b0 +
-f_s(s) + f_u(u) [+ f_m(m)] + g(s) * rewarded``: the omission side's clock
+f_s(s) + f_u(u) + g(s) * rewarded``: the omission side's clock
 curves (:class:`PlantedClocks`), and the effect of a reward ``g``, which may
 change with time since arrival. ``b0`` is set so that the session's expected
 total is ``total`` (when given; else ``b0 = 0``).
@@ -18,37 +18,33 @@ The two forms of the model's reward effect (``visit_rate.REWARD_FORMS``)
 estimate different things when the effect changes with time since arrival, so
 each scenario gives both (:class:`Planted`):
 
-- ``omission_side``, the truth of ``reward_form="time_varying"``. That form
-  fits one arrival curve for the rows after an omission and a second one for
-  the rows after a reward, so its arrival curve is the omission side's; the
-  leaving curve is shared, and is ``f_u`` because the effect changes with
-  time since arrival only. Q1 and Q7a are the range contrasts of ``f_s`` and
-  ``f_u``. Q2 is the model's coefficient: the rewarded arrival curve sums to
-  zero over the rewarded rows of the design, so the coefficient is the mean of
-  ``g`` over those rows (one weight per row, the arrival clock clamped at its
-  basis range). It is computed on the rows given (one session's). The run
-  builds the design on the pooled rows of every session
-  (``visit_rate_simulation``), so the rewarded curve sums to zero over the
-  pooled rewarded rows and this value is the model's only approximately
-  (exactly where ``g`` is constant).
-- ``pooled``, the truth of ``reward_form="coefficient"``. That form fits ONE
-  arrival curve and ONE leaving curve for both outcomes and one coefficient,
-  so where ``g`` changes with time the shared curves absorb the part of the
-  effect that the coefficient cannot hold, in proportion to the share of
-  rewarded expected events at each clock value. The pooled truth is the
-  Poisson projection of the planted expected counts onto that form
+- ``by_outcome``, the truth of the declared form (``reward_form="by_outcome"``,
+  the convention's twenty-sixth round). That form fits an arrival curve for
+  each outcome and one leaving curve, so its curve after an omission is
+  ``f_s`` and its leaving curve ``f_u`` (the effect changes with time since
+  arrival only), and its difference curve is ``g``. Q1 and Q7a are the range
+  contrasts of ``f_s`` and ``f_u``; Q2 and the onset test (``Q2-onset``) are
+  the plain means of ``g`` over their windows (``declared_tests.Q2_WINDOW_S``,
+  ``ONSET_WINDOW_S``) on ``contrasts.range_grid``, in closed form: one weight
+  per grid point, not per row (the follow-up's truth,
+  ``.claude/research/2026-11-20-regression-prototypes/design_d_trial/rate/followup/REPORT.md``,
+  "Design notes"). They are the window contrasts of the model's own form, so
+  they hold for a later onset too, where no ratio is planted.
+- ``pooled``, the truth of ``reward_form="coefficient"`` (the secondary value,
+  ``visit_rate.SECONDARY_ESTIMAND``). That form fits ONE arrival curve and ONE
+  leaving curve for both outcomes and one coefficient, so where ``g`` changes
+  with time the shared curves absorb the part of the effect that the
+  coefficient cannot hold. The pooled truth of the coefficient is the Poisson
+  projection of the planted expected counts onto that form
   (:func:`poisson_projection`): ``log mu = log mu_ref + a(arrival cell) +
   b(leaving cell) + beta * rewarded``, fitted exactly to the session's own
   expected counts, with ``mu_ref`` the omission side's planted rate and ``a``,
-  ``b`` steps on cells of ``ARRIVAL_CELL_S`` and ``LEAVING_CELL_S`` (the
-  stretch clock, if planted, held at its curve). It is a projection onto
-  those cell steps, not onto the model's penalized splines, so it is not the
-  model's own limit; that is the engine's unit target, ``planted_unit`` (the
-  model fitted to the expected counts with the weak penalty off,
-  ``regression.simulation``).
-  Pooled Q1 is the range contrast of ``f_s + a``, pooled Q7a that of ``f_u +
-  b``, pooled Q2 is ``beta``. Where ``g`` is constant, both truths are the
-  planted curves' contrasts and ``g``.
+  ``b`` steps on cells of ``ARRIVAL_CELL_S`` and ``LEAVING_CELL_S``. It is a
+  projection onto those cell steps, not onto the model's penalized splines,
+  so it is not the model's own limit; that is the engine's unit target,
+  ``planted_unit`` (``regression.simulation``). Where ``g`` is constant it is
+  ``g``. Where the outcomes differ only in their arrival curve (a later onset
+  after an omission) no ratio is planted, and the coefficient's truth is NaN.
 
 :meth:`Planted.for_form` gives the truth of one reward form
 (:data:`TRUTH_OF_FORM`).
@@ -56,15 +52,10 @@ each scenario gives both (:class:`Planted`):
 The range contrasts are the means of ``visit_rate.declared_contrasts``'s
 windows on the same grid (``contrasts.range_grid``), so a curve's additive
 constant cancels. Q1's reference window is an argument (the declared ``(0,
-1)`` by default). Where the outcomes differ only in their arrival curve (a
-later onset after an omission), there is no planted reward ratio: Q2, the
-single reward coefficient, is NaN in both truths. Under the decided window
-form (the convention's twenty-sixth round) such a scenario has a real,
-nonzero window truth (the difference of the two arrival curves over the
-window), which the next step computes. The rate table (:func:`rate_table_truth`) plants no curve: both
-of its truths are projections (see there). Given a table tabulated from real
-counts (as ``visit_rate_simulation`` does), its planted rate and its truths
-are the real data's pooled model-free values, not a chosen truth.
+1)`` by default). The rate table (:func:`rate_table_truth`) plants no curve:
+both of its truths are projections (see there). Given a table tabulated from
+real counts (as ``visit_rate_simulation`` does), its planted rate and its
+truths are the real data's pooled model-free values, not a chosen truth.
 """
 
 from __future__ import annotations
@@ -80,7 +71,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.regression.contrasts import range_grid
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-from ..declared_tests import estimand
+from ..declared_tests import ONSET_WINDOW_S, Q2_WINDOW_S, estimand
 from .visit_rate import (
     ARRIVAL,
     CLOCK_BASES,
@@ -88,13 +79,15 @@ from .visit_rate import (
     LEAVING,
     RESPONSE,
     REWARD,
-    STRETCH,
+    SECONDARY_ESTIMAND,
 )
 
 __all__ = [
     "ARRIVAL_CELL_S",
     "LEAVING_CELL_S",
     "TRUTH_OF_FORM",
+    "WINDOWS",
+    "window_means",
     "Planted",
     "PlantedClocks",
     "Projection",
@@ -125,8 +118,15 @@ LEAVING_CELL_S = 0.05
 
 #: The truth each reward form of the model estimates (module docstring).
 TRUTH_OF_FORM: dict[str, str] = {
+    "by_outcome": "by_outcome",
     "coefficient": "pooled",
-    "time_varying": "omission_side",
+}
+
+#: The window estimands of the by-outcome form and their windows (s since
+#: arrival), read from ``declared_tests``.
+WINDOWS: dict[str, tuple[float, float]] = {
+    "Q2": Q2_WINDOW_S,
+    "Q2-onset": ONSET_WINDOW_S,
 }
 
 #: The projection's convergence: the largest log ratio of a margin's planted
@@ -172,22 +172,16 @@ class PlantedClocks:
         ``f_s``, over time since arrival (s).
     leaving : callable
         ``f_u``, over time until leaving (s).
-    stretch : callable or None
-        ``f_m``, over time until the end of the stretch (s); None is flat.
     """
 
     arrival: LogCurve
     leaving: LogCurve
-    stretch: LogCurve | None = None
 
     def log_rate(self, rows: pd.DataFrame) -> np.ndarray:
-        """``f_s + f_u [+ f_m]`` at each row, shape ``(n_rows,)``."""
-        out = self.arrival(rows[ARRIVAL].to_numpy(dtype=float)) + self.leaving(
+        """``f_s + f_u`` at each row, shape ``(n_rows,)``."""
+        return self.arrival(rows[ARRIVAL].to_numpy(dtype=float)) + self.leaving(
             rows[LEAVING].to_numpy(dtype=float)
         )
-        if self.stretch is not None:
-            out = out + self.stretch(rows[STRETCH].to_numpy(dtype=float))
-        return out
 
     def curve_values(
         self, q1_reference_s: tuple[float, float] = _Q1.second
@@ -197,6 +191,17 @@ class PlantedClocks:
             "Q1": _range_contrast(self.arrival, _Q1.first, q1_reference_s),
             "Q7a": _range_contrast(self.leaving, _Q7A.first, _Q7A.second),
         }
+
+
+def window_means(effect: LogCurve) -> dict[str, float]:
+    """The plain mean of a reward effect ``g`` over each window of
+    :data:`WINDOWS` on ``contrasts.range_grid``: the window truths of the
+    by-outcome form for an effect that depends on the time since arrival
+    only."""
+    return {
+        name: float(np.mean(effect(range_grid(*window))))
+        for name, window in WINDOWS.items()
+    }
 
 
 def _range_contrast(
@@ -216,21 +221,23 @@ class Planted(NamedTuple):
     ----------
     expected : np.ndarray, shape (n_rows,)
         The expected count of each bin.
+    by_outcome : dict of str to float
+        Q1 and Q7a of the omission side's arrival curve and the leaving
+        curve, Q2 and Q2-onset the means of the reward effect over their
+        windows: the truth of ``reward_form="by_outcome"``.
     pooled : dict of str to float
-        Q1, Q2 and Q7a of one shared arrival curve, one shared leaving curve
-        and one coefficient: the truth of ``reward_form="coefficient"``.
-    omission_side : dict of str to float
-        Q1 and Q7a of the omission side's arrival curve and the shared
-        leaving curve, Q2 the time-varying form's coefficient: the truth of
-        ``reward_form="time_varying"``. NaN where the scenario has none.
+        The reward coefficient of one shared arrival curve, one shared
+        leaving curve and one coefficient (``visit_rate.SECONDARY_ESTIMAND``):
+        the truth of ``reward_form="coefficient"``; NaN where no ratio is
+        planted.
     """
 
     expected: np.ndarray
+    by_outcome: dict[str, float]
     pooled: dict[str, float]
-    omission_side: dict[str, float]
 
-    def for_form(self, reward_form: str = "coefficient") -> dict[str, float]:
-        """The planted Q1, Q2 and Q7a of one reward form (:data:`TRUTH_OF_FORM`)."""
+    def for_form(self, reward_form: str = "by_outcome") -> dict[str, float]:
+        """The planted values of one reward form (:data:`TRUTH_OF_FORM`)."""
         if reward_form not in TRUTH_OF_FORM:
             raise ValueError(f"reward_form {reward_form!r} not in {set(TRUTH_OF_FORM)}")
         return getattr(self, TRUTH_OF_FORM[reward_form])
@@ -336,7 +343,7 @@ def poisson_projection(
         The rate the steps multiply (positive where ``expected`` is).
     by_outcome : bool
         False: one arrival step for both outcomes and ``beta`` (the coefficient
-        form); True: an arrival step for each outcome (the time-varying form).
+        form); True: an arrival step for each outcome (the by-outcome form).
     arrival_cell_s, leaving_cell_s : float
         The cells' widths (s); each splits its clock's basis range.
 
@@ -442,30 +449,23 @@ def _from_curves(
     q1_reference_s: tuple[float, float],
     planted_ratio: bool = True,
 ) -> Planted:
-    """The scenario ``log mu = b0 + f_s + f_u [+ f_m] + g(s) * rewarded``,
+    """The scenario ``log mu = b0 + f_s + f_u + g(s) * rewarded``,
     ``clocks`` the omission side's curves and ``effect`` ``g``, with both
     truths (module docstring)."""
     rewarded = _rewarded(rows)
     s = rows[ARRIVAL].to_numpy(dtype=float)
     g = effect(s) * rewarded
     expected = _scaled(rows, clocks.log_rate(rows) + g, total)
-    reference = expected * np.exp(-g)
-    projection = poisson_projection(rows, expected, reference, by_outcome=False)
-    hi = CLOCK_BASES[ARRIVAL][1]
-    on_rewarded = effect(np.minimum(s[rewarded == 1.0], hi))
-    omission_q2 = float(np.mean(on_rewarded)) if on_rewarded.size else np.nan
-    pooled_q2 = projection.beta
-    if not planted_ratio:
-        omission_q2 = pooled_q2 = np.nan
+    coefficient = np.nan
+    if planted_ratio:
+        reference = expected * np.exp(-g)
+        coefficient = poisson_projection(
+            rows, expected, reference, by_outcome=False
+        ).beta
     return Planted(
         expected,
-        {
-            **_projected_contrasts(
-                projection, clocks.arrival, clocks.leaving, q1_reference_s
-            ),
-            "Q2": pooled_q2,
-        },
-        {**clocks.curve_values(q1_reference_s), "Q2": omission_q2},
+        {**clocks.curve_values(q1_reference_s), **window_means(effect)},
+        {SECONDARY_ESTIMAND: coefficient},
     )
 
 
@@ -514,11 +514,11 @@ def fading_ratio(
     """A ratio that fades with time since arrival: ``g(s) = log_ratio`` up to
     ``fade_start_s``, falling linearly to 0 at ``fade_end_s``, 0 after.
 
-    ``clocks`` are the omission side's curves. The time-varying form's truth
-    (``omission_side``): their Q1 and Q7a, and Q2 the mean of ``g`` over the
-    rewarded rows. The coefficient form's (``pooled``): the projection's
-    (module docstring), whose shared arrival curve takes part of the fading
-    effect, so its Q1 differs from the omission side's.
+    ``clocks`` are the omission side's curves. The by-outcome form's truth:
+    their Q1 and Q7a, and Q2 and Q2-onset the means of ``g`` over their
+    windows. The coefficient form's (``pooled``): the projection's
+    coefficient (module docstring), which the shared curves keep away from
+    the fading part of the effect.
     """
     if not fade_end_s > fade_start_s:
         raise ValueError("the fade ends after it starts")
@@ -604,13 +604,11 @@ def later_onset_after_omission(
     is ``clocks.arrival`` ``delay_s`` later, ``f_s(max(s - delay_s, 0))``;
     after a reward it is ``f_s(s)``.
 
-    The omission side's arrival curve is the delayed one, so the time-varying
-    form's Q1 is the delayed curve's; the coefficient form's is the
-    projection's (module docstring). Q2 is NaN in both truths: Q2 here is
-    the single reward coefficient, and no constant ratio is planted. Under
-    the decided window form (twenty-sixth round) this scenario has a real,
-    nonzero window truth, the difference of the two arrival curves over the
-    window, which the next step computes; it is not computed here.
+    The omission side's arrival curve is the delayed one, so the by-outcome
+    form's Q1 is the delayed curve's, and its window truths are the means of
+    the difference ``g(s) = f_s(s) - f_s(max(s - delay_s, 0))`` over the
+    windows: real and nonzero while the delayed curve has not caught up. No
+    ratio is planted, so the coefficient form's truth is NaN.
     """
 
     def delayed(s: np.ndarray) -> np.ndarray:
@@ -619,7 +617,7 @@ def later_onset_after_omission(
     def effect(s: np.ndarray) -> np.ndarray:
         return clocks.arrival(np.asarray(s, dtype=float)) - delayed(s)
 
-    omission = PlantedClocks(delayed, clocks.leaving, clocks.stretch)
+    omission = PlantedClocks(delayed, clocks.leaving)
     return _from_curves(
         rows,
         omission,
@@ -640,14 +638,12 @@ def drop_before_leaving(
     q1_reference_s: tuple[float, float] = _Q1.second,
 ) -> Planted:
     """A drop of the log rate by ``drop`` in the last ``width_s`` before
-    leaving, on the leaving clock only, with no reward effect and no stretch
-    effect.
+    leaving, on the leaving clock only, with no reward effect.
 
     ``f_u(u) = -drop`` for ``u < width_s``, 0 after; planted Q7a is that
     step's range contrast (``-drop`` when the last window lies inside
     ``width_s`` and the reference window beyond it), Q1 the arrival curve's
-    and Q2 0. A model with the stretch clock may move part of the drop to
-    ``f_m``, since in a visit's last stretch the two clocks are equal.
+    and Q2 0.
     """
 
     def leaving(u: np.ndarray) -> np.ndarray:
@@ -661,6 +657,12 @@ def drop_before_leaving(
     )
 
 
+#: The time-bin table's time until the end of the immobile stretch (s): no
+#: model reads it (the rate model has two clocks, the twenty-seventh round);
+#: :func:`drop_before_small_movements` plants a drop on it.
+STRETCH_COLUMN = "time_until_stretch_end_s"
+
+
 def drop_before_small_movements(
     rows: pd.DataFrame,
     arrival: LogCurve,
@@ -671,25 +673,23 @@ def drop_before_small_movements(
     q1_reference_s: tuple[float, float] = _Q1.second,
 ) -> Planted:
     """A drop of the log rate by ``drop`` in the last ``width_s`` of every
-    immobile stretch, on the stretch clock only, with a flat leaving curve and
-    no reward effect.
+    immobile stretch (``time_until_stretch_end_s``), with a flat leaving curve
+    and no reward effect: data the two-clock model cannot represent.
 
-    ``f_m(m) = -drop`` for ``m < width_s``; ``f_u`` is flat, so planted Q7a
-    is 0, Q1 the arrival curve's and Q2 0. The visit's last stretch ends at
-    the final poke-out, so the rate drops before leaving too: a model must
-    give the drop to ``f_m``, or the third clock's rule must catch that it
-    cannot.
+    ``f_m(m) = -drop`` for ``m < width_s``; the leaving curve is flat, so the
+    planted Q7a is 0, Q1 the arrival curve's and the window truths and the
+    coefficient 0. A visit's last stretch ends at the final poke-out, so the
+    rate drops before leaving too: with two clocks Q7a cannot tell a drop
+    before leaving from a drop before any movement, and this scenario
+    measures how much of the drop it reads (the engine's ``planted_unit`` is
+    the model's own projection of it).
     """
-
-    def stretch(m: np.ndarray) -> np.ndarray:
-        return np.where(np.asarray(m) < width_s, -float(drop), 0.0)
-
-    return no_effect(
-        rows,
-        PlantedClocks(arrival, _zero, stretch),
-        total=total,
-        q1_reference_s=q1_reference_s,
+    base = no_effect(rows, PlantedClocks(arrival, _zero), q1_reference_s=q1_reference_s)
+    m = rows[STRETCH_COLUMN].to_numpy(dtype=float)
+    log_rate = PlantedClocks(arrival, _zero).log_rate(rows) + np.where(
+        m < width_s, -float(drop), 0.0
     )
+    return Planted(_scaled(rows, log_rate, total), base.by_outcome, base.pooled)
 
 
 # --- The rate table --------------------------------------------------------------
@@ -793,20 +793,20 @@ def rate_table_truth(
     contrasts of the projection's steps:
 
     - ``pooled``: one arrival step for both outcomes, one leaving step and
-      ``beta``; Q2 is ``beta``.
-    - ``omission_side``: an arrival step for each outcome and one leaving
-      step; Q1 is the omission rows' arrival step's, and Q2 the mean over the
-      rewarded rows of their arrival step less the omission rows' in the same
-      cell (the time-varying form's coefficient).
+      ``beta``; the reward coefficient is ``beta``.
+    - ``by_outcome``: an arrival step for each outcome and one leaving step;
+      Q1 is the omission rows' arrival step's, Q7a the leaving step's, and Q2
+      and Q2-onset the means over their windows (on ``range_grid``) of the
+      rewarded rows' arrival step less the omission rows' in the same cell.
 
     A value whose window or rows fall in a cell without exposure is NaN.
 
     The truth is only as chosen as the table. ``visit_rate_simulation``
     tabulates the REAL counts (``rate_table_from_bins`` on the real rows), so
-    there the planted rate is the real data's, and Q1, Q2 and Q7a are an
-    unpenalized Poisson projection of the model's coefficient form onto it: in
-    substance the real data's pooled model-free values. They are not a result
-    of the simulation and are not to be quoted as one.
+    there the planted rate is the real data's, and the truths are an
+    unpenalized Poisson projection of the model's forms onto it: in substance
+    the real data's pooled model-free values. They are not a result of the
+    simulation and are not to be quoted as one.
     """
     outcome, arrival_cell, leaving_cell = table.cells(rows)
     expected = _scaled(
@@ -816,17 +816,15 @@ def rate_table_truth(
     cells = {"arrival_cell_s": arrival_cell_s, "leaving_cell_s": leaving_cell_s}
     pooled = poisson_projection(rows, expected, reference, by_outcome=False, **cells)
     by_outcome = poisson_projection(rows, expected, reference, by_outcome=True, **cells)
-    rewarded = outcome == 1
-    s = rows[ARRIVAL].to_numpy(dtype=float)[rewarded]
-    step = by_outcome.arrival_at(s, 1) - by_outcome.arrival_at(s, 0)
+
+    def step(x: np.ndarray) -> np.ndarray:
+        return by_outcome.arrival_at(x, 1) - by_outcome.arrival_at(x, 0)
+
     return Planted(
         expected,
         {
-            **_projected_contrasts(pooled, _zero, _zero, q1_reference_s),
-            "Q2": pooled.beta,
-        },
-        {
             **_projected_contrasts(by_outcome, _zero, _zero, q1_reference_s),
-            "Q2": float(np.mean(step)) if step.size else np.nan,
+            **window_means(step),
         },
+        {SECONDARY_ESTIMAND: pooled.beta},
     )

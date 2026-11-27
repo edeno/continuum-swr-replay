@@ -93,6 +93,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   - [nonlocal_minimum_duration_rounding.md](known_issues/nonlocal_minimum_duration_rounding.md) — the 15 ms minimum is 7 samples.
   - [smooth_by_a_thin_level.md](known_issues/smooth_by_a_thin_level.md) — *open*: a smooth by a level has no support count.
   - [penalized_level_split_by_its_prior.md](known_issues/penalized_level_split_by_its_prior.md) — *open*: with a baseline intercept per session, a penalized level a session holds alone is split by its prior.
+  - [calibration_stops_at_a_failed_fit.md](known_issues/calibration_stops_at_a_failed_fit.md) — *open*: a declared-penalty calibration stops when one unit's first fit fails at a trial penalty.
 - [history/2026-module-moves.md](history/2026-module-moves.md) — *history*: where moved code and data went in 2026, and the dated audits the docs once cited.
 
 ## Code layout

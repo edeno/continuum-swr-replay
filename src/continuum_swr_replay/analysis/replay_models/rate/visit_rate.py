@@ -1,19 +1,26 @@
-"""The visit rate model: event starts on the three visit clocks, models A and D.
+"""The visit rate model: event starts on the two visit clocks, models A and D.
 
-One fit for each session and each kind (SWR, No SWR), by the shared fitter
-(``analysis.regression``): plain penalized maximum likelihood, Poisson with
-the offset ``log(exposure)``, on the in-visit at-risk bins of the visit
-time-bin design (``replay_models.visit_design.visit_timebins``).
+One fit for each unit of the fit (``VisitRateSettings.fit_by``: a recording
+day or an animal, ``fit_by.BEHAVIOR_FIT_BY``, the convention's twenty-fourth
+round; or a session, the earlier design, for the validation and comparison)
+and each kind (SWR, No SWR), by the shared fitter (``analysis.regression``):
+plain penalized maximum likelihood, Poisson with the offset
+``log(exposure)``, on the in-visit at-risk bins of the visit time-bin design
+(``replay_models.visit_design.visit_timebins``). Inside a unit each session
+keeps its own intercept (the baseline, ``declared_tests.BASELINES``) and every
+other term (the clock curves, the reward terms, model D's lag curve) is
+shared.
 
 - Model A: ``f_s(time since the first poke-in) + f_u(time until the final
-  poke-out) [+ f_m(time until the end of the immobile stretch)] + beta *
-  last_outcome_rewarded``.
+  poke-out) + beta * last_outcome_rewarded`` (in the declared by-outcome form,
+  ``f_s`` for each last outcome). Two clocks (DECIDED, lead, 2026-11-26: "no
+  just two"); the time-bin table's ``time_until_stretch_end_s`` is not read.
 - Model D: the same smooths and, in place of the 0/1 term, a smooth curve over
   the last ten known outcomes on the log-lag scale (a lag functional), on the
   bins with ten known outcomes.
 
 Each clock curve, and model D's lag curve, is a cubic P-spline at ONE fixed,
-declared log penalty, the same in every session; no penalty is chosen from
+declared log penalty, the same in every unit; no penalty is chosen from
 the data. The reward coefficient, the one simple tested coefficient, carries
 the weak penalty (a Normal prior of mean 0, ``terms.log_penalty_from_prior_sd``);
 the intercept is not penalized. Every model's design is checked by
@@ -22,9 +29,8 @@ the intercept is not penalized. Every model's design is checked by
 The model's form has open questions. Each is a named setting below, in one
 place, with the values allowed; :class:`VisitRateSettings` holds one choice of
 each, and the model builds and fits for every allowed choice. The defaults
-are the declared form (the coefficient form of the reward effect, Q1's
-declared reference window, all in-visit bins, the third clock in the first
-fit). The log penalties of the module (:data:`CLOCK_LOG_PENALTIES`) are
+are the declared form (the by-outcome form of the reward effect, Q1's
+declared reference window, all in-visit bins). The log penalties of the module (:data:`CLOCK_LOG_PENALTIES`) are
 provisional: :func:`fit_visit_rate` refuses them unless the caller says the
 fit is a test or a simulation; a real fit carries calibrated penalties
 (:class:`CalibratedPenalty`).
@@ -33,27 +39,14 @@ The cohort step (:func:`cohort_rows`): ``visit_timebins`` of a session and
 kind -> ``select_visit_context`` (the only filter of the bins) -> the bins
 beyond the time range, if one is set, dropped and counted -> the rows with a
 missing covariate dropped and counted -> model D also drops the bins without
-ten known outcomes, and every bin of a session whose outcomes cannot
-identify the lag curve (:func:`model_d_rows`), counted. The counts are added
-to every record's ``cohort_counts``. The two clocks that count down reference the future
+ten known outcomes (:func:`model_d_rows`), counted. At the fit, model D drops
+every bin of a unit whose outcomes cannot identify the lag curve, judged on
+the unit's rows with each session's intercept (:func:`lag_curve_counts`),
+counted. A unit's counts (its sessions' counts summed, and model D's of the
+unit) are added to its record's ``cohort_counts``, in model A's and model D's
+records alike. The two clocks that count down reference the future
 (``covariate_timing.FUTURE_REFERENCING``): this model describes; it does not
 predict.
-
-The third clock's rule, written before any fit (:func:`third_clock_decision`):
-fit A with ``f_m``; if the concurvity ``estimate`` of ``f_m`` or of ``f_u`` is
-at least ``collinearity.MAX_EXPLAINED`` (0.8) in more than
-``MAX_FAILING_SHARE`` (20 %) of the sessions with a fit, A is refit without
-``f_m``, and the time-until-movement curve is reported only from the
-model-free curves. Both fits are stored.
-
-The rule does not see everything the third clock does to Q7a. In a visit's
-last immobile stretch the stretch clock equals the leaving clock, so with
-``f_m`` in the model part of a drop before leaving can move to ``f_m`` while
-the concurvity stays below 0.8. Q7a read from a fit with ``f_m`` is therefore
-the drop before leaving conditional on the time until the end of the stretch,
-not the whole drop. ``visit_rate_statistics.third_clock_q7a`` compares Q7a of
-the fits with and without ``f_m``, per session and summarized; it is stored
-beside the rule's decision.
 """
 
 from __future__ import annotations
@@ -78,14 +71,14 @@ from continuum_swr_replay.analysis.regression.calibration import (
     EdfCalibration,
     log_penalty_for_edf,
 )
-from continuum_swr_replay.analysis.regression.collinearity import separable
-from continuum_swr_replay.analysis.regression.constants import MAX_FAILING_SHARE
 from continuum_swr_replay.analysis.regression.likelihoods import Poisson
-from continuum_swr_replay.analysis.regression.newton import CONVERGED
 from continuum_swr_replay.analysis.regression.pspline import PSplineBasis
 from continuum_swr_replay.analysis.regression.record import FitRecord
 from continuum_swr_replay.analysis.regression.sessions import SessionKey, fit_sessions
-from continuum_swr_replay.analysis.regression.support import require_tested_penalized
+from continuum_swr_replay.analysis.regression.support import (
+    MIN_UNITS,
+    require_tested_penalized,
+)
 from continuum_swr_replay.analysis.regression.terms import (
     Category,
     Design,
@@ -97,8 +90,17 @@ from continuum_swr_replay.analysis.regression.terms import (
     build_design,
     log_penalty_from_prior_sd,
 )
+from continuum_swr_replay.tables.session_keys import FitBy, fit_by_columns, unit_key
 
-from ..declared_tests import CoefficientContrast, CurveContrast, estimand
+from ..declared_tests import (
+    BASELINES,
+    Q2_WINDOW_S,
+    CoefficientContrast,
+    CurveContrast,
+    OutcomeWindowContrast,
+    estimand,
+)
+from ..fit_by import BEHAVIOR_FIT_BY
 from ..visit_design import EVENT_KINDS, REWARD_LAG_COLUMNS, visit_timebins
 
 __all__ = [
@@ -113,17 +115,22 @@ __all__ = [
     "MODEL_NAMES",
     "Q1_REFERENCE_WINDOWS",
     "RATE_ESTIMANDS",
+    "SECONDARY_ESTIMAND",
+    "WINDOW_TESTS",
+    "WINDOW_TEST_UNIT",
+    "is_declared_test",
+    "OMITTED_ARRIVAL_TERM",
+    "ARRIVAL_BY_OUTCOME",
+    "ARRIVAL_CENTER_S",
     "RESPONSE",
     "REWARDED_ARRIVAL_TERM",
     "REWARD",
     "REWARD_FORMS",
-    "STRETCH",
     "TIME_RANGE_CAPS_S",
     "UNIT",
     "WEAK_PRIOR_SD",
     "WEAK_PRIOR_SD_SENSITIVITY",
     "CohortRows",
-    "ThirdClockDecision",
     "VisitRateFit",
     "VisitRateSettings",
     "CalibratedPenalty",
@@ -135,12 +142,21 @@ __all__ = [
     "declared_contrasts",
     "fit_visit_rate",
     "fit_visit_rate_session",
+    "lag_curve_counts",
     "lag_curve_rows",
     "model_d_rows",
     "model_terms",
     "require_declared_penalized",
     "tested_terms",
-    "third_clock_decision",
+    "window_contrast",
+    "window_reads",
+    "window_support",
+    "window_parts",
+    "SUPPORT_PART_S",
+    "WINDOW_SUPPORT",
+    "DIFFERENCE_STEP_S",
+    "difference_curve_rows",
+    "difference_grid",
 ]
 
 # --- The columns the model reads -------------------------------------------
@@ -149,8 +165,6 @@ __all__ = [
 ARRIVAL = "time_since_visit_start_s"
 #: Time until the final poke-out of the visit (s); counts down.
 LEAVING = "time_until_visit_end_s"
-#: Time until the end of the current immobile stretch (s); counts down.
-STRETCH = "time_until_stretch_end_s"
 #: The last known outcome, 1 rewarded and 0 omitted (lag 1 of the history).
 REWARD = "last_outcome_rewarded"
 #: The bin's at-risk seconds, the Poisson offset's column.
@@ -167,8 +181,33 @@ MODELS: tuple[str, ...] = ("A", "D")
 MODEL_NAMES: dict[str, str] = {"A": "visit_rate_A", "D": "visit_rate_D"}
 
 #: The declared estimands this model answers (``declared_tests``), all read
-#: from model A.
-RATE_ESTIMANDS: tuple[str, ...] = ("Q1", "Q2", "Q7a")
+#: from model A's by-outcome form.
+RATE_ESTIMANDS: tuple[str, ...] = ("Q1", "Q2", "Q2-onset", "Q7a")
+
+#: The window tests of the by-outcome form (``declared_tests``: Q2 and the
+#: onset test), and the one unit at which they are declared tests: DECIDED
+#: (the twenty-sixth round, added with the lead's "ok"): "which is why the
+#: window tests are read per animal, not per day". At another unit their
+#: values are a description (:func:`is_declared_test`).
+WINDOW_TESTS: tuple[str, ...] = ("Q2", "Q2-onset")
+WINDOW_TEST_UNIT = "animal"
+
+
+def is_declared_test(estimand_id: str, fit_by: str) -> bool:
+    """Whether an estimand is a declared test of the rate model at a unit of
+    the fit: the declared estimands (:data:`RATE_ESTIMANDS`) at every unit,
+    but the window tests (:data:`WINDOW_TESTS`) at :data:`WINDOW_TEST_UNIT`
+    only."""
+    if estimand_id not in RATE_ESTIMANDS:
+        return False
+    return estimand_id not in WINDOW_TESTS or fit_by == WINDOW_TEST_UNIT
+
+
+#: The secondary value, read from model A's coefficient form: the one reward
+#: coefficient (the twenty-sixth round: kept for comparison with other
+#: studies, described as mixing the timing with the rate; not a declared
+#: test).
+SECONDARY_ESTIMAND = "reward_coefficient"
 
 # --- The bases -------------------------------------------------------------
 
@@ -177,7 +216,6 @@ RATE_ESTIMANDS: tuple[str, ...] = ("Q1", "Q2", "Q7a")
 CLOCK_BASES: dict[str, tuple[float, float, float]] = {
     ARRIVAL: (0.0, 20.0, 0.5),
     LEAVING: (0.0, 3.0, 0.1),
-    STRETCH: (0.0, 1.5, 0.1),
 }
 
 #: Model D's lag curve: basis functions over ``[log 1, log 10]``.
@@ -194,9 +232,13 @@ def _smooth_name(column: str) -> str:
     return f"s({column})"
 
 
-#: The term of the reward effect's own arrival curve (the time-varying form):
-#: the arrival smooth fitted on the rows after a reward.
+#: The arrival curve after an omission, of the by-outcome reward form: the
+#: arrival smooth fitted on the rows whose last outcome was omitted.
+OMITTED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=0"
+#: The arrival curve after a reward, of the by-outcome reward form.
 REWARDED_ARRIVAL_TERM = f"{_smooth_name(ARRIVAL)}:{REWARD}=1"
+#: The two arrival curves of the by-outcome form, by last outcome.
+ARRIVAL_BY_OUTCOME: dict[int, str] = {0: OMITTED_ARRIVAL_TERM, 1: REWARDED_ARRIVAL_TERM}
 
 # --- OPEN (lead): the settings of the model's form --------------------------
 #
@@ -233,20 +275,19 @@ CLOCK_PENALTY_SETTINGS: tuple[str, ...] = ("declared", "stiffer", "looser")
 #: fit takes each curve's penalty from :func:`calibrate_log_penalty`, carried
 #: by ``VisitRateSettings.calibrated_penalties`` with its target and rows;
 #: :func:`fit_visit_rate` refuses these values unless the fit is a test or a
-#: simulation. The stretch clock takes the leaving clock's values (the same
-#: knot spacing); model D's lag curve is 2, with 4 and 0 either side; the
-#: rewarded arrival curve of the time-varying reward form takes the arrival
-#: clock's value.
+#: simulation. Model D's lag curve is 2, with 4 and 0 either side; each
+#: arrival curve of the by-outcome reward form takes the arrival clock's
+#: value (:meth:`VisitRateSettings.log_penalty`).
 CLOCK_LOG_PENALTIES: dict[str, dict[str, dict[str, float]]] = {
     "SWR": {
-        "declared": {ARRIVAL: 1.0522, LEAVING: 3.0718, STRETCH: 3.0718, LAG_TERM: 2.0},
-        "stiffer": {ARRIVAL: 3.8344, LEAVING: 5.3921, STRETCH: 5.3921, LAG_TERM: 4.0},
-        "looser": {ARRIVAL: -1.7300, LEAVING: 0.7515, STRETCH: 0.7515, LAG_TERM: 0.0},
+        "declared": {ARRIVAL: 1.0522, LEAVING: 3.0718, LAG_TERM: 2.0},
+        "stiffer": {ARRIVAL: 3.8344, LEAVING: 5.3921, LAG_TERM: 4.0},
+        "looser": {ARRIVAL: -1.7300, LEAVING: 0.7515, LAG_TERM: 0.0},
     },
     "No SWR": {
-        "declared": {ARRIVAL: 1.8472, LEAVING: 3.2544, STRETCH: 3.2544, LAG_TERM: 2.0},
-        "stiffer": {ARRIVAL: 4.3179, LEAVING: 5.5317, STRETCH: 5.5317, LAG_TERM: 4.0},
-        "looser": {ARRIVAL: -0.6235, LEAVING: 0.9771, STRETCH: 0.9771, LAG_TERM: 0.0},
+        "declared": {ARRIVAL: 1.8472, LEAVING: 3.2544, LAG_TERM: 2.0},
+        "stiffer": {ARRIVAL: 4.3179, LEAVING: 5.5317, LAG_TERM: 4.0},
+        "looser": {ARRIVAL: -0.6235, LEAVING: 0.9771, LAG_TERM: 0.0},
     },
 }
 
@@ -267,33 +308,26 @@ PROVISIONAL_USES: tuple[str, ...] = ("test", "simulation")
 #: leaving the cap removes (:func:`cohort_rows`).
 TIME_RANGE_CAPS_S: tuple[float | None, ...] = (None, 10.0)
 
-#: DECIDED (lead, 2026-11-25), NOT YET BUILT: the reward effect is read from
-#: an arrival curve for each outcome, each penalized on its own (``outcome +
-#: s(arrival, by = outcome)``), with the leaving curve shared by both
-#: outcomes; two declared window contrasts (the outcome term plus the mean
-#: over the window of the rewarded arrival curve minus the omitted one): Q2
-#: over 4 to 10 s after arrival, and the onset over 2 to 4 s. The one
-#: coefficient stays as a secondary value. That form replaces
-#: ``"time_varying"`` below (a shared curve plus a difference curve, read
-#: over the rewarded rows) when it is built.
-#:
-#: The forms built today. ``"coefficient"`` (the default, the declared Q2
-#: until the decided form is built): one coefficient, and one arrival curve
-#: for both outcomes. ``"time_varying"``: the same coefficient and a second arrival
-#: curve for the rows after a reward (a smooth ``by`` the last outcome,
-#: sum-to-zero over the rewarded rows of the design), so the effect may change
-#: with time since arrival. The form changes the meaning of Q1 as well as of
-#: Q2. Under the coefficient form, where the effect changes with time, the one
-#: arrival curve holds the part of the effect the coefficient cannot (in
-#: proportion to the rewarded share of the events at each time since arrival),
-#: and so does the leaving curve; under the time-varying form the arrival
-#: curve is the curve after an omission, and Q2 is the effect averaged over
-#: the design's rewarded rows (one weight per row). That average reads the
-#: curve after an omission at the rewarded rows' arrival times; where no
-#: omission row has that time, the curve there is the penalty's
-#: extrapolation. ``visit_rate_scenarios`` gives the truth of each form. An
-#: option to build and test, not the declared test.
-REWARD_FORMS: tuple[str, ...] = ("coefficient", "time_varying")
+#: DECIDED (lead, 2026-11-25, the convention's twenty-sixth round): the form of
+#: the reward effect. ``"by_outcome"`` (the default, the declared form): an
+#: arrival curve for each last outcome, each a smooth ``by`` the outcome with
+#: its own sum-to-zero constraint (over Q2's window, :data:`ARRIVAL_CENTER_S`,
+#: so that the outcome coefficient is Q2) and its own declared penalty, the outcome coefficient (the weak penalty) and the
+#: leaving curve shared by both outcomes: ``outcome +
+#: session + s(arrival, by = outcome) + s(leaving) + offset(log exposure)``.
+#: The outcome coefficient and the two centered curves identify the
+#: difference curve ``beta + f_1(s) - f_0(s)`` (the log rate ratio after a
+#: reward at time ``s`` since arrival, at the same time before leaving), so
+#: the reward effect may change with time since arrival, and only along it.
+#: Q2 and the onset test are its mean over declared windows, Q1 is read from
+#: the arrival curve after an omission (``declared_tests``).
+#: ``"coefficient"``: one arrival curve for both outcomes and one reward
+#: coefficient. Its coefficient is the SECONDARY value
+#: (:data:`SECONDARY_ESTIMAND`), for comparison with other studies: where
+#: the effect changes with time since arrival it mixes the timing with the
+#: rate. The form of a shared curve plus a difference curve
+#: (``"time_varying"``) was decided against (the same round) and removed.
+REWARD_FORMS: tuple[str, ...] = ("by_outcome", "coefficient")
 
 #: OPEN (lead): the reference window of Q1 (s since arrival). ``(0, 1)`` is
 #: the declared one (``declared_tests``, the default); ``(1, 2)`` the
@@ -342,16 +376,23 @@ class VisitRateSettings:
     max_time_since_arrival_s : float or None
         :data:`TIME_RANGE_CAPS_S`. With a cap, Q7a is read only from the
         visits that end before it (see there).
-    reward_form : {"coefficient", "time_varying"}
-        :data:`REWARD_FORMS`. The time-varying form changes what Q1 means (the
-        arrival curve becomes the curve after an omission) as well as Q2.
+    reward_form : {"by_outcome", "coefficient"}
+        :data:`REWARD_FORMS`: the declared form (an arrival curve for each
+        outcome) or the secondary one (one coefficient).
     q1_reference_s : tuple of float
         :data:`Q1_REFERENCE_WINDOWS`.
-    include_stretch_clock : bool
-        Whether model A and D hold ``f_m``; the third clock's rule
-        (:func:`third_clock_decision`) decides it after the first fit, which
-        holds it. With ``f_m``, Q7a is conditional on the third clock (module
-        docstring).
+    fit_by : {"day", "animal", "session"}
+        The unit of the fit, one for each run (DECIDED, the convention's
+        twenty-fourth round): one of ``fit_by.BEHAVIOR_FIT_BY``, the units every
+        behavior model is fitted at (the first is the default); ``"session"``
+        is the earlier design, kept for the validation and for comparison.
+        Each session keeps its own intercept (the baseline,
+        ``declared_tests.BASELINES``); every other term is shared inside the
+        unit. That the clock curves are shared is the author's reading, not
+        the lead's words: the formula the lead agreed to (the twenty-sixth
+        round) has the session as an intercept only and no curve by session,
+        and the follow-up simulation supports it (per-session curves were the
+        worst form).
     log_penalties : mapping of str to float or None
         Curve column (or :data:`LAG_TERM`) -> a log penalty in place of the
         table's, for the calibration and the tests; None uses the table. A
@@ -367,9 +408,9 @@ class VisitRateSettings:
     weak_prior_sd: float = WEAK_PRIOR_SD
     clock_penalty: Literal["declared", "stiffer", "looser"] = "declared"
     max_time_since_arrival_s: float | None = None
-    reward_form: Literal["coefficient", "time_varying"] = "coefficient"
+    reward_form: Literal["by_outcome", "coefficient"] = "by_outcome"
     q1_reference_s: tuple[float, float] = (0.0, 1.0)
-    include_stretch_clock: bool = True
+    fit_by: FitBy = BEHAVIOR_FIT_BY[0]
     log_penalties: Mapping[str, float] | None = None
     calibrated_penalties: Mapping[tuple[str, str], CalibratedPenalty] | None = None
 
@@ -393,6 +434,7 @@ class VisitRateSettings:
                 f"q1_reference_s {self.q1_reference_s} not in {Q1_REFERENCE_WINDOWS}"
             )
         object.__setattr__(self, "q1_reference_s", reference)
+        fit_by_columns(self.fit_by)
 
     @property
     def weak_log_penalty(self) -> float:
@@ -400,18 +442,29 @@ class VisitRateSettings:
         return log_penalty_from_prior_sd(self.weak_prior_sd)
 
     def log_penalty(self, kind: str, curve: str) -> float:
-        """The log penalty of one curve (a clock column or :data:`LAG_TERM`)."""
+        """The log penalty of one curve (a clock column, an arrival curve of
+        :data:`ARRIVAL_BY_OUTCOME` or :data:`LAG_TERM`). Each curve has its
+        own; in :data:`CLOCK_LOG_PENALTIES` an arrival curve by outcome takes
+        the arrival clock's value."""
         if self.log_penalties is not None and curve in self.log_penalties:
             return float(self.log_penalties[curve])
         calibrated = self.calibrated_penalties or {}
         if (_kind(kind), curve) in calibrated:
             return float(calibrated[(kind, curve)].log_penalty)
-        return CLOCK_LOG_PENALTIES[kind][self.clock_penalty][curve]
+        table = ARRIVAL if curve in ARRIVAL_BY_OUTCOME.values() else curve
+        return CLOCK_LOG_PENALTIES[kind][self.clock_penalty][table]
 
     def curves(self, model: str) -> tuple[str, ...]:
         """The curves of a model whose log penalty this setting gives: the
-        clocks and, for model D, :data:`LAG_TERM`."""
-        return (*self.clocks(), *((LAG_TERM,) if _model(model) == "D" else ()))
+        clocks (model A's by-outcome form: the two arrival curves,
+        :data:`ARRIVAL_BY_OUTCOME`, in place of the arrival clock) and, for
+        model D, :data:`LAG_TERM`."""
+        if _model(model) == "D":
+            return (*self.clocks(), LAG_TERM)
+        clocks = self.clocks()
+        if self.reward_form == "by_outcome":
+            return (*ARRIVAL_BY_OUTCOME.values(), *clocks[1:])
+        return clocks
 
     def provisional_curves(self, model: str, kind: str) -> tuple[str, ...]:
         """The model's curves whose log penalty has no calibration record:
@@ -426,7 +479,7 @@ class VisitRateSettings:
 
     def clocks(self) -> tuple[str, ...]:
         """The clock columns the model holds, in order."""
-        return (ARRIVAL, LEAVING, *((STRETCH,) if self.include_stretch_clock else ()))
+        return (ARRIVAL, LEAVING)
 
     def clock_range(self, clock: str) -> tuple[float, float]:
         """A clock's basis range: the arrival clock's ends at the cap."""
@@ -452,11 +505,43 @@ def _model(model: str) -> str:
 
 
 def _clock_smooth(
-    clock: str, kind: str, settings: VisitRateSettings, **by: object
+    clock: str, kind: str, settings: VisitRateSettings, curve: str | None = None, **by
 ) -> Smooth:
+    """A clock's smooth at the log penalty of ``curve`` (the clock's own by
+    default)."""
     lo, hi = settings.clock_range(clock)
     basis = PSplineBasis.from_spacing(lo, hi, CLOCK_BASES[clock][2])
-    return Smooth(clock, lo, hi, basis.n_basis, settings.log_penalty(kind, clock), **by)
+    penalty = settings.log_penalty(kind, curve or clock)
+    return Smooth(clock, lo, hi, basis.n_basis, penalty, **by)
+
+
+#: The points each arrival curve of the by-outcome form sums to zero over
+#: (``terms.Smooth.center_on``): the grid ``OutcomeWindowContrast`` averages
+#: over for Q2's window (``declared_tests.Q2_WINDOW_S``). Each curve's mean
+#: over Q2's window is then zero, so the outcome coefficient IS Q2, and the
+#: weak penalty (prior SD 2) sits on the tested log rate ratio: zero when the
+#: two curves are the same curve. THE COORDINATOR'S CALL (2026-11-26), for the
+#: twenty-fifth round's "every simple tested coefficient". Each session's
+#: intercept is then its log rate after an omission at the window's mean of
+#: the arrival curve, at the leaving curve's pooled mean (unpenalized, so the
+#: fit is the same model as with the curves centered on the rows, up to where
+#: the weak penalty sits).
+#:
+#: Where a unit's rows after an omission do not reach Q2's window, the weak
+#: penalty then holds most of the outcome coefficient (its edf about 0.2 to
+#: 0.6, not 0.99), about 0.4 to 0.9 edf moves into the omitted curve's term,
+#: and Q1, the onset test and Q7a move a little (at SD 2 by up to 0.028,
+#: 0.016 and 0.018, against standard errors of 0.54, 0.28 and 0.38); with
+#: support nothing changes (edf equal to 3 decimals). The review's simulation
+#: numbers on synthetic rows, 2026-11-26; ``docs/design/regression_fitter.md``,
+#: the ``center_on`` passage.
+ARRIVAL_CENTER_S: tuple[float, ...] = tuple(
+    float(x) for x in contrasts.range_grid(*Q2_WINDOW_S)
+)
+
+#: The last outcome as the ``by`` of the by-outcome form's arrival curves (a
+#: category used only as a ``by``, so not a term: its penalty is not read).
+_OUTCOME = Category(REWARD, (0, 1), 0, "none")
 
 
 def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term]:
@@ -471,21 +556,33 @@ def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term
     Returns
     -------
     list of terms
-        The offset, the clock smooths, then model A's reward slope (and, in
-        the time-varying form, the rewarded rows' arrival smooth) or model
-        D's lag curve. The intercept is the design's, unpenalized.
+        The offset, the arrival curves (model A's by-outcome form: one for
+        each last outcome, :data:`ARRIVAL_BY_OUTCOME`, each at its own
+        penalty; else one), the other clock smooths, then model A's reward
+        coefficient or model D's lag curve. The intercept is the design's,
+        unpenalized: the baseline.
     """
     _model(model)
     _kind(kind)
     terms: list[Term] = [Offset(EXPOSURE)]
-    terms += [_clock_smooth(clock, kind, settings) for clock in settings.clocks()]
+    if model == "A" and settings.reward_form == "by_outcome":
+        terms += [
+            _clock_smooth(
+                ARRIVAL,
+                kind,
+                settings,
+                term,
+                by=_OUTCOME,
+                levels=(level,),
+                center_on=ARRIVAL_CENTER_S,
+            )
+            for level, term in ARRIVAL_BY_OUTCOME.items()
+        ]
+    else:
+        terms.append(_clock_smooth(ARRIVAL, kind, settings))
+    terms += [_clock_smooth(clock, kind, settings) for clock in settings.clocks()[1:]]
     if model == "A":
         terms.append(Slope(REWARD, settings.weak_log_penalty))
-        if settings.reward_form == "time_varying":
-            outcome = Category(REWARD, (0, 1), 0, "none")
-            terms.append(
-                _clock_smooth(ARRIVAL, kind, settings, by=outcome, levels=(1,))
-            )
     else:
         terms.append(
             LinearFunctional(
@@ -502,15 +599,16 @@ def model_terms(model: str, kind: str, settings: VisitRateSettings) -> list[Term
 
 def tested_terms(model: str, settings: VisitRateSettings) -> tuple[str, ...]:
     """The terms and coefficients the model's estimands read: model A's
-    declared tests (Q1, Q7a: the clock smooths; Q2: the reward coefficient,
-    and the rewarded arrival curve in the time-varying form); model D's lag
-    curve (described, not tested)."""
+    by-outcome form, its declared tests (Q1: the arrival curve after an
+    omission; Q2 and the onset test: the reward coefficient and both arrival
+    curves; Q7a: the leaving curve); model A's coefficient form, its
+    secondary value (the reward coefficient); model D's lag curve
+    (described, not tested)."""
     if _model(model) == "D":
         return (LAG_TERM,)
-    out = [_smooth_name(ARRIVAL), _smooth_name(LEAVING), REWARD]
-    if settings.reward_form == "time_varying":
-        out.append(REWARDED_ARRIVAL_TERM)
-    return tuple(out)
+    if settings.reward_form == "by_outcome":
+        return (*ARRIVAL_BY_OUTCOME.values(), _smooth_name(LEAVING), REWARD)
+    return (REWARD,)
 
 
 def require_declared_penalized(
@@ -530,8 +628,10 @@ def build_visit_rate_design(
     """Model A's or D's design on the pooled rows of its sessions and kind.
 
     The sum-to-zero constraints are computed on ``pooled_rows``, so every
-    session fitted with this design shares them. The guard
-    (:func:`require_declared_penalized`) is called on the built design.
+    unit fitted with this design shares them. The intercept is the model's
+    baseline (``declared_tests.BASELINES``): in a fit of several sessions
+    each session has its own. The guard (:func:`require_declared_penalized`)
+    is called on the built design.
 
     Parameters
     ----------
@@ -546,7 +646,10 @@ def build_visit_rate_design(
     Design
     """
     design = build_design(
-        model_terms(model, kind, settings), pooled_rows, intercept=True
+        model_terms(model, kind, settings),
+        pooled_rows,
+        intercept=True,
+        baseline=BASELINES[MODEL_NAMES[model]],
     )
     require_declared_penalized(design, model, settings)
     return design
@@ -557,7 +660,7 @@ def build_visit_rate_design(
 
 def _probe(design: Design, n: int) -> pd.DataFrame:
     """Rows at which every column the model reads is 0 (exposure 1)."""
-    columns = [ARRIVAL, LEAVING, STRETCH, REWARD, *REWARD_LAG_COLUMNS]
+    columns = [ARRIVAL, LEAVING, REWARD, *REWARD_LAG_COLUMNS]
     frame = pd.DataFrame(0.0, index=np.arange(n), columns=columns)
     frame[EXPOSURE] = 1.0
     return frame
@@ -610,17 +713,47 @@ def lag_curve_rows(design: Design) -> np.ndarray:
     return out
 
 
+def window_contrast(design: Design, contrast: OutcomeWindowContrast) -> np.ndarray:
+    """The ``c`` of an outcome window contrast (``declared_tests``): the
+    outcome coefficient plus the mean over the window, on
+    ``contrasts.range_grid``, of the rewarded arrival curve less the omitted
+    one.
+
+    Raises
+    ------
+    ValueError
+        If the window lies outside a curve's basis range (beyond it a clamped
+        smooth is flat), or the design lacks a term or the coefficient.
+    """
+    basis = design.basis_record()
+    grid = contrasts.range_grid(*contrast.window)
+    c = contrasts.coefficient_contrast(design.coef_names, (contrast.coefficient,))
+    for term, sign in ((contrast.plus_term, 1.0), (contrast.minus_term, -1.0)):
+        if term not in design.by_name:
+            raise ValueError(f"{term!r} is not in the design")
+        lo, hi = basis[term]["range"]
+        a, b = contrast.window
+        if a < lo - 1e-9 * (hi - lo) or b > hi + 1e-9 * (hi - lo):
+            raise ValueError(
+                f"the window [{a}, {b}] lies outside the term's range [{lo}, {hi}]"
+            )
+        c = c + sign * curve_rows(design, term)(grid).mean(axis=0)
+    return c
+
+
 def declared_contrasts(
     design: Design, settings: VisitRateSettings
 ) -> dict[str, np.ndarray]:
-    """The ``c`` of each declared estimand of the model (Q1, Q2, Q7a), on
-    model A's design.
+    """The ``c`` of each estimand of model A's form.
 
-    Each is read from ``declared_tests``; Q1's reference window is the
-    setting's (the declared ``(0, 1)`` by default). A curve contrast is the
-    range mean of its smooth over the contrast's ranges
-    (``contrasts.range_mean_contrast``), which must lie inside the term's
-    basis range; a coefficient contrast names coefficients of the design.
+    The by-outcome form gives the declared estimands (:data:`RATE_ESTIMANDS`:
+    Q1, Q2, Q2-onset, Q7a), each read from ``declared_tests``; Q1's
+    reference window is the setting's (the declared ``(0, 1)`` by default).
+    A curve contrast is the range mean of its smooth over the contrast's
+    ranges (``contrasts.range_mean_contrast``), which must lie inside the
+    term's basis range; an outcome window contrast is
+    :func:`window_contrast`. The coefficient form gives the secondary value
+    alone (:data:`SECONDARY_ESTIMAND`, the reward coefficient).
 
     Returns
     -------
@@ -633,6 +766,12 @@ def declared_contrasts(
         If a declared estimand is not of model A, or names a term or a
         coefficient the design lacks.
     """
+    if settings.reward_form == "coefficient":
+        return {
+            SECONDARY_ESTIMAND: contrasts.coefficient_contrast(
+                design.coef_names, (REWARD,)
+            )
+        }
     out = {}
     basis = design.basis_record()
     for estimand_id in RATE_ESTIMANDS:
@@ -653,6 +792,8 @@ def declared_contrasts(
                 contrast.second,
                 term_range=tuple(basis[contrast.term]["range"]),
             )
+        elif isinstance(contrast, OutcomeWindowContrast):
+            out[estimand_id] = window_contrast(design, contrast)
         elif isinstance(contrast, CoefficientContrast):
             out[estimand_id] = contrasts.coefficient_contrast(
                 design.coef_names, contrast.plus, contrast.minus
@@ -660,6 +801,152 @@ def declared_contrasts(
         else:
             raise ValueError(f"{estimand_id}: a {type(contrast).__name__} contrast")
     return out
+
+
+# --- The support of a window contrast -------------------------------------------
+
+#: The key of a record's ``cohort_counts`` that holds :func:`window_support`.
+WINDOW_SUPPORT = "window_support"
+
+
+def window_reads(
+    settings: VisitRateSettings,
+) -> dict[str, tuple[tuple[int, tuple[float, float]], ...]]:
+    """What each declared estimand of the by-outcome form reads along the
+    arrival clock: (last outcome, range of time since arrival) pairs.
+
+    Q1 reads the curve after an omission over its two ranges (the second the
+    setting's reference window); Q2 and Q2-onset read both outcomes' curves
+    over their window. Q7a reads the leaving curve, shared by both outcomes,
+    and has no window read.
+    """
+    out = {}
+    for estimand_id in RATE_ESTIMANDS:
+        contrast = estimand(estimand_id).contrast
+        if isinstance(contrast, OutcomeWindowContrast):
+            out[estimand_id] = tuple((level, contrast.window) for level in (1, 0))
+        elif contrast.term in ARRIVAL_BY_OUTCOME.values():
+            level = {t: k for k, t in ARRIVAL_BY_OUTCOME.items()}[contrast.term]
+            second = settings.q1_reference_s if estimand_id == "Q1" else contrast.second
+            out[estimand_id] = ((level, contrast.first), (level, second))
+    return out
+
+
+#: The longest part of a range a window contrast reads that the window
+#: support rule counts on its own (s): THE COORDINATOR'S CALL (2026-11-26), not
+#: the lead's. A window's mean weighs every part of the window equally, so
+#: every part needs rows; 2 s is about what a curve of 10 to 15 effective
+#: parameters over 20 s can resolve.
+SUPPORT_PART_S = 2.0
+
+
+def window_parts(lo: float, hi: float) -> list[tuple[float, float]]:
+    """A range cut into equal parts no longer than :data:`SUPPORT_PART_S`
+    (one part for a range of 2 s or less)."""
+    n = max(1, int(np.ceil((hi - lo) / SUPPORT_PART_S - 1e-9)))
+    edges = np.linspace(lo, hi, n + 1)
+    return [(float(a), float(b)) for a, b in zip(edges[:-1], edges[1:], strict=True)]
+
+
+def window_support(
+    sessions: Sequence[pd.DataFrame],
+    settings: VisitRateSettings,
+    reads: Mapping[str, Sequence[tuple[int, tuple[float, float]]]] | None = None,
+) -> dict[str, dict]:
+    """The support of each window contrast in one unit of the fit (the
+    window support rule; the author's rule, written for the twenty-sixth
+    round's "under the support rule", cut into parts by the coordinator's call).
+
+    Each range an estimand reads (:func:`window_reads`) is cut into parts no
+    longer than :data:`SUPPORT_PART_S` (:func:`window_parts`: Q2's 4 to 10 s
+    into 4 to 6, 6 to 8 and 8 to 10; the onset test's 2 to 4 s and Q1's
+    ranges are one part each). For each part and each outcome the estimand
+    reads, the unit's rows of that last outcome whose time since arrival lies
+    in the part (``lo <= s < hi``) are counted: the visits with such a row
+    (the support rule's unit, a visit; each session's visits apart) and their
+    at-risk seconds. An estimand is supported when every part of every read
+    has at least ``support.MIN_UNITS`` visits: the rule of a 0/1 slope
+    (``support.binary_support``) counted on the rows of each part. So a part
+    of a window that no visit after an omission reaches, where the curve
+    would be the penalty's extrapolation, makes the estimand unsupported. No
+    response is read. An unsupported value is not a number:
+    ``visit_rate_statistics.unit_estimands`` and the simulation engine
+    (``Model.support``) give it none.
+
+    Parameters
+    ----------
+    sessions : sequence of pd.DataFrame
+        The rows of each session in the unit's fit (a session dropped from
+        the fit is not given).
+    settings : VisitRateSettings
+    reads : mapping, optional
+        Estimand id -> its (outcome, range) reads; :func:`window_reads` of
+        the settings by default.
+
+    Returns
+    -------
+    dict
+        Estimand id -> ``{"supported": bool, "reads": [{"outcome": 0 or 1,
+        "range_s": [lo, hi], "visits": int, "at_risk_s": float}, ...]}``, one
+        entry per part, JSON-ready.
+    """
+    out = {}
+    if reads is None:
+        reads = window_reads(settings)
+    for estimand_id, estimand_reads in reads.items():
+        entries = []
+        for level, (lo, hi) in estimand_reads:
+            for part_lo, part_hi in window_parts(lo, hi):
+                visits, at_risk = 0, 0.0
+                for rows in sessions:
+                    s = rows[ARRIVAL].to_numpy(dtype=float)
+                    on = (
+                        (rows[REWARD].to_numpy(dtype=float) == level)
+                        & (s >= part_lo)
+                        & (s < part_hi)
+                    )
+                    visits += int(rows.loc[on, UNIT].nunique())
+                    at_risk += float(rows.loc[on, EXPOSURE].sum())
+                entries.append(
+                    {
+                        "outcome": level,
+                        "range_s": [part_lo, part_hi],
+                        "visits": visits,
+                        "at_risk_s": at_risk,
+                    }
+                )
+        out[estimand_id] = {
+            "supported": all(e["visits"] >= MIN_UNITS for e in entries),
+            "reads": entries,
+        }
+    return out
+
+
+# --- The difference curve ---------------------------------------------------------
+
+#: The grid of the difference curve (s since arrival): 0.1 s steps over the
+#: arrival clock's basis range. It is shown, not tested.
+DIFFERENCE_STEP_S = 0.1
+
+
+def difference_grid(settings: VisitRateSettings) -> np.ndarray:
+    """The difference curve's grid over the arrival clock's range, shape
+    ``(n_points,)``."""
+    lo, hi = settings.clock_range(ARRIVAL)
+    return np.round(np.arange(lo, hi + 1e-9, DIFFERENCE_STEP_S), 10)
+
+
+def difference_curve_rows(design: Design, grid: np.ndarray) -> np.ndarray:
+    """The rows of the coefficient vector that give the difference curve
+    ``beta + f_1(s) - f_0(s)`` (the log rate ratio after a reward against
+    after an omission at time ``s`` since arrival) at each grid point, shape
+    ``(n_points, n_coef)``."""
+    reward = contrasts.coefficient_contrast(design.coef_names, (REWARD,))
+    return (
+        reward[None, :]
+        + curve_rows(design, REWARDED_ARRIVAL_TERM)(grid)
+        - curve_rows(design, OMITTED_ARRIVAL_TERM)(grid)
+    )
 
 
 # --- The cohort step ----------------------------------------------------------
@@ -705,29 +992,36 @@ _Q7A_SPAN_S = max(
 )
 
 
-def _lag_curve_identified(rows: pd.DataFrame) -> bool:
-    """Whether the rows' outcomes identify the lag curve's unpenalized part.
+def _lag_curve_identified(sessions: Sequence[pd.DataFrame]) -> bool:
+    """Whether the unit's rows identify the lag curve's unpenalized part.
 
     The lag curve's penalty leaves a constant and a line in log lag
     unpenalized; on a row they give ``sum_l r_l`` and ``sum_l r_l log l``.
-    With the intercept, these three columns must have full rank. They do not
-    when every outcome of the session is the same (each lag column constant),
-    and then the fitter refuses the session's design.
+    With each session's intercept (the baseline; one intercept for a unit of
+    one session), these columns must have full rank on the unit's rows. They
+    do not when, in every session of the unit, every outcome is the same
+    (each lag column constant in each session), and then the fitter refuses
+    the unit's design. A session of constant outcomes inside a unit whose
+    other sessions vary does not stop it.
     """
-    lags = rows[list(REWARD_LAG_COLUMNS)].to_numpy(dtype=float)
+    parts = [rows for rows in sessions if len(rows)]
+    if not parts:
+        return False
+    lags = np.vstack([p[list(REWARD_LAG_COLUMNS)].to_numpy(dtype=float) for p in parts])
+    sizes = [len(p) for p in parts]
+    indicators = np.repeat(np.eye(len(parts)), sizes, axis=0)
     columns = np.column_stack(
-        [np.ones(len(lags)), lags.sum(axis=1), lags @ np.log(np.asarray(LAGS))]
+        [indicators, lags.sum(axis=1), lags @ np.log(np.asarray(LAGS))]
     )
-    return len(lags) > 0 and np.linalg.matrix_rank(columns) == columns.shape[1]
+    return np.linalg.matrix_rank(columns) == columns.shape[1]
 
 
 def model_d_rows(rows_a: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
-    """Model D's rows of one session, from model A's.
+    """Model D's rows of one session, from model A's: the bins with ten known
+    outcomes.
 
-    Model D keeps the bins with ten known outcomes. When those bins' outcomes
-    cannot identify the lag curve (every outcome the same, for one), the
-    session has no model D rows: its fit is recorded as not fitted, and the
-    other sessions are fitted.
+    Whether the rows identify the lag curve is judged on the rows of the unit
+    of the fit, not here (:func:`lag_curve_counts`).
 
     Parameters
     ----------
@@ -737,22 +1031,40 @@ def model_d_rows(rows_a: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
     Returns
     -------
     rows : pd.DataFrame
-        Model D's rows.
+        The bins with ten known outcomes.
     counts : dict of str to int
-        ``bins_``/``events_`` ``without_ten_lags`` (of model A's rows),
-        ``lag_curve_not_identified`` (the rows with ten known outcomes left
-        out for that reason; 0 or all of them) and ``D``.
+        ``bins_``/``events_`` ``without_ten_lags`` (of model A's rows).
     """
     without = ~rows_a[list(REWARD_LAG_COLUMNS)].notna().all(axis=1).to_numpy()
     counts = _counted(rows_a.loc[without], "without_ten_lags")
-    rows_d = rows_a.loc[~without].reset_index(drop=True)
-    not_identified = not rows_d.empty and not _lag_curve_identified(rows_d)
-    counts |= _counted(
-        rows_d if not_identified else rows_d.iloc[:0], "lag_curve_not_identified"
-    )
-    if not_identified:
-        rows_d = rows_d.iloc[:0]
-    return rows_d, counts | _counted(rows_d, "D")
+    return rows_a.loc[~without].reset_index(drop=True), counts
+
+
+def lag_curve_counts(sessions: Sequence[pd.DataFrame]) -> dict[str, int]:
+    """Model D's counts of one unit of the fit, from its sessions' model D
+    rows (:func:`model_d_rows`).
+
+    When the unit's rows cannot identify the lag curve
+    (:func:`_lag_curve_identified`), the unit has no model D rows: its fit is
+    recorded as not fitted, and the other units are fitted.
+
+    Parameters
+    ----------
+    sessions : sequence of pd.DataFrame
+        The model D rows of each session of the unit.
+
+    Returns
+    -------
+    dict of str to int
+        ``bins_``/``events_`` ``lag_curve_not_identified`` (the unit's rows
+        left out for that reason; 0 or all of them) and ``D`` (the rows
+        model D fits).
+    """
+    rows = pd.concat(list(sessions), ignore_index=True)
+    not_identified = not rows.empty and not _lag_curve_identified(sessions)
+    left = rows if not_identified else rows.iloc[:0]
+    kept = rows.iloc[:0] if not_identified else rows
+    return _counted(left, "lag_curve_not_identified") | _counted(kept, "D")
 
 
 def cohort_rows(
@@ -861,6 +1173,26 @@ def cohort_rows(
     return CohortRows(kind, {"A": rows_a, "D": rows_d}, counts)
 
 
+def _summed(counts: Sequence[Mapping]) -> dict:
+    """The cohort counts of a unit: its sessions' counts, summed key by key
+    (a count summed, a nested mapping summed by its keys, a flag that must
+    agree kept once). The counts of one session are themselves."""
+    out: dict = {}
+    for name in dict.fromkeys(k for c in counts for k in c):
+        values = [c[name] for c in counts if name in c]
+        if all(isinstance(v, Mapping) for v in values):
+            out[name] = _summed(values)
+        elif all(isinstance(v, bool | np.bool_) for v in values):
+            if len(set(values)) > 1:
+                raise ValueError(f"cohort count {name!r} differs between sessions")
+            out[name] = values[0]
+        elif all(isinstance(v, int | np.integer) for v in values):
+            out[name] = int(sum(values))
+        else:
+            raise ValueError(f"cohort count {name!r} cannot be summed: {values}")
+    return out
+
+
 # --- The fit -------------------------------------------------------------------
 
 
@@ -874,8 +1206,10 @@ class VisitRateFit(NamedTuple):
     design : Design
         Built on the pooled rows of the sessions fitted.
     records : list of FitRecord
-        One per session, in the order given; ``cohort_counts`` holds the
-        cohort step's counts too.
+        One per unit of the fit (``settings.fit_by``), in the order of each
+        unit's first session given; ``cohort_counts`` holds the cohort step's
+        counts too, summed over the unit's sessions, and model D's counts of
+        the unit (:func:`lag_curve_counts`).
     """
 
     model: str
@@ -885,17 +1219,32 @@ class VisitRateFit(NamedTuple):
     records: list[FitRecord]
 
 
-def _session_rows(
-    cohort: Mapping[SessionKey, CohortRows], model: str, kind: str
-) -> dict[SessionKey, pd.DataFrame]:
-    out = {}
+def _unit_rows(
+    cohort: Mapping[SessionKey, CohortRows], model: str, kind: str, fit_by: FitBy
+) -> tuple[dict[SessionKey, pd.DataFrame], dict[tuple, dict]]:
+    """Each session's rows of the model, and each unit's cohort counts.
+
+    The units are those of ``fit_by`` (``tables.session_keys.unit_key``). A
+    unit's counts are its sessions' counts summed (:func:`_summed`) and model
+    D's counts of the unit (:func:`lag_curve_counts`); model D's rows of a
+    unit that cannot identify the lag curve are emptied.
+    """
+    sessions, units = {}, {}
     for key, rows in cohort.items():
         if rows.kind != kind:
             raise ValueError(
                 f"session {'/'.join(key)}: rows of {rows.kind}, not {kind}"
             )
-        out[key] = rows.rows[model]
-    return out
+        sessions[key] = rows.rows[model]
+        units.setdefault(unit_key(key, fit_by), []).append(key)
+    counts = {}
+    for unit, keys in units.items():
+        counts_d = lag_curve_counts([cohort[key].rows["D"] for key in keys])
+        if model == "D" and counts_d["bins_lag_curve_not_identified"]:
+            for key in keys:
+                sessions[key] = sessions[key].iloc[:0]
+        counts[unit] = _summed([cohort[key].counts for key in keys]) | counts_d
+    return sessions, counts
 
 
 def fit_visit_rate(
@@ -907,12 +1256,13 @@ def fit_visit_rate(
     table_sha256: Mapping[str, str] | None = None,
     allow_provisional: Literal["test", "simulation"] | None = None,
 ) -> VisitRateFit:
-    """Fit model A or D of one kind in every session given.
+    """Fit model A or D of one kind in every unit of the sessions given.
 
     The design is built on the pooled rows of the sessions given
-    (:func:`build_visit_rate_design`), then every session is fitted alone at
-    the declared log penalties by ``sessions.fit_sessions``. No penalty is
-    chosen from the data and nothing is selected. A curve whose log penalty
+    (:func:`build_visit_rate_design`), then each unit of ``settings.fit_by``
+    (a recording day, an animal, or a session) is fitted at the declared log
+    penalties by ``sessions.fit_sessions``, each session with its own
+    intercept. No penalty is chosen from the data and nothing is selected. A curve whose log penalty
     has no calibration record (``VisitRateSettings.provisional_curves``) is
     refused unless ``allow_provisional`` says the fit is a test or a
     simulation.
@@ -954,7 +1304,7 @@ def fit_visit_rate(
             "(calibrate_log_penalty, VisitRateSettings.calibrated_penalties) or "
             "pass allow_provisional='test' or 'simulation'"
         )
-    sessions = _session_rows(cohort, model, kind)
+    sessions, counts = _unit_rows(cohort, model, kind, settings.fit_by)
     pooled = pd.concat(list(sessions.values()), ignore_index=True)
     design = build_visit_rate_design(model, kind, pooled, settings)
     records = fit_sessions(
@@ -966,11 +1316,30 @@ def fit_visit_rate(
         response=RESPONSE,
         unit=UNIT,
         table_sha256=dict(table_sha256 or {}),
+        fit_by=settings.fit_by,
     )
     records = [
-        replace(r, cohort_counts={**r.cohort_counts, **cohort[key].counts})
-        for key, r in zip(sessions, records, strict=True)
+        replace(r, cohort_counts={**r.cohort_counts, **counts[r.unit_key]})
+        for r in records
     ]
+    if model == "A" and settings.reward_form == "by_outcome":
+        records = [
+            replace(
+                r,
+                cohort_counts={
+                    **r.cohort_counts,
+                    WINDOW_SUPPORT: window_support(
+                        [
+                            sessions[(e["animal"], e["session_date"], e["epoch"])]
+                            for e in r.sessions
+                            if e["n_rows"] > 0
+                        ],
+                        settings,
+                    ),
+                },
+            )
+            for r in records
+        ]
     return VisitRateFit(model, kind, settings, design, records)
 
 
@@ -1004,9 +1373,10 @@ def calibrate_log_penalty(
     target_edf: float,
     settings: VisitRateSettings,
 ) -> EdfCalibration:
-    """The log penalty of one curve at which its median edf over the sessions
-    is ``target_edf`` (``calibration.log_penalty_for_edf``), every other
-    penalty at the setting's value.
+    """The log penalty of one curve at which its median edf over the units of
+    the fit (``settings.fit_by``) is ``target_edf``
+    (``calibration.log_penalty_for_edf``), every other penalty at the
+    setting's value.
 
     Parameters
     ----------
@@ -1014,7 +1384,9 @@ def calibrate_log_penalty(
     model : {"A", "D"}
     kind : {"SWR", "No SWR"}
     curve : str
-        A clock column of the model, or :data:`LAG_TERM` for model D.
+        A curve of :meth:`VisitRateSettings.curves`: a clock column, an
+        arrival curve of :data:`ARRIVAL_BY_OUTCOME`, or :data:`LAG_TERM` for
+        model D.
     target_edf : float
     settings : VisitRateSettings
 
@@ -1022,10 +1394,11 @@ def calibrate_log_penalty(
     -------
     EdfCalibration
     """
-    sessions = _session_rows(cohort, _model(model), _kind(kind))
+    sessions, _ = _unit_rows(cohort, _model(model), _kind(kind), settings.fit_by)
     pooled = pd.concat(list(sessions.values()), ignore_index=True)
     design = build_visit_rate_design(model, kind, pooled, settings)
-    term = curve if curve == LAG_TERM else _smooth_name(curve)
+    named = (LAG_TERM, *ARRIVAL_BY_OUTCOME.values())
+    term = curve if curve in named else _smooth_name(curve)
     return log_penalty_for_edf(
         design,
         sessions,
@@ -1034,62 +1407,5 @@ def calibrate_log_penalty(
         target_edf=target_edf,
         response=RESPONSE,
         unit=UNIT,
+        fit_by=settings.fit_by,
     )
-
-
-# --- The third clock's rule ---------------------------------------------------
-
-
-class ThirdClockDecision(NamedTuple):
-    """The third clock's rule on model A's fit with ``f_m``.
-
-    Attributes
-    ----------
-    keep : bool
-        False when ``f_m`` leaves the model.
-    share : float
-        The share of the sessions with a fit in which ``f_m`` or ``f_u`` is
-        not separable (concurvity ``estimate`` at least ``MAX_EXPLAINED``).
-    n_sessions : int
-        The sessions with a fit, in which both terms are measured.
-    """
-
-    keep: bool
-    share: float
-    n_sessions: int
-
-
-def third_clock_decision(records: Sequence[FitRecord]) -> ThirdClockDecision:
-    """The third clock's rule (module docstring) on model A's records with
-    ``f_m``: keep ``f_m`` when the share of sessions in which it or ``f_u`` is
-    not separable is at most ``MAX_FAILING_SHARE`` (a share of exactly 20 %
-    keeps it).
-
-    The rule reads the concurvity only. A drop before leaving can move in
-    part to ``f_m`` while the concurvity stays below the threshold, so the
-    decision is stored with ``visit_rate_statistics.third_clock_q7a``, Q7a
-    with and without ``f_m``.
-
-    Raises
-    ------
-    ValueError
-        If no session has a fit with both terms measured.
-    """
-    pair = (_smooth_name(STRETCH), _smooth_name(LEAVING))
-    flagged = []
-    for record in records:
-        if record.status != CONVERGED or record.no_fit:
-            continue
-        measured = {
-            name: record.collinearity[name]
-            for name in pair
-            if name in record.collinearity
-            and "not_measured" not in record.collinearity[name]
-        }
-        if len(measured) < len(pair):
-            continue
-        flagged.append(not all(separable(measured).values()))
-    if not flagged:
-        raise ValueError("no session has a fit with f_m and f_u measured")
-    share = float(np.mean(flagged))
-    return ThirdClockDecision(share <= MAX_FAILING_SHARE, share, len(flagged))

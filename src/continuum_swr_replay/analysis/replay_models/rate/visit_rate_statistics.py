@@ -1,33 +1,47 @@
-"""The estimands of the visit rate model, per session and over sessions.
+"""The estimands of the visit rate model, per unit of the fit and over units.
 
-Each declared estimand of the model (Q1, Q2, Q7a; ``declared_tests``) is a
-linear functional of model A's coefficients (``visit_rate.declared_contrasts``),
-so its variance in a session is exact: ``c' V c`` with ``V`` the fit's
-Bayesian covariance (``regression.contrasts``). A session without a kept fit,
-or with a coefficient the contrast uses left out, has no value (NaN).
+A fit of the model gives one record per unit of the fit (``fit_by``: a
+recording day or an animal, or a session for the validation and comparison;
+``visit_rate.VisitRateSettings.fit_by``). Each estimand of model A's form is a
+linear functional of the fit's coefficients (``visit_rate.declared_contrasts``:
+the declared Q1, Q2, Q2-onset and Q7a of the by-outcome form, or the secondary
+reward coefficient of the coefficient form), mapped onto each record's
+coefficients by name (``terms.Design.contrast_on``, which refuses a contrast
+that reads a baseline), so its variance in a unit is exact: ``c' V c`` with
+``V`` the fit's Bayesian covariance (``regression.contrasts``). A unit without
+a kept fit, or with a coefficient the contrast uses left out, has no value
+(NaN).
 
-Over sessions, each estimand is summarized for each kind and for the
-difference between the kinds (the SWR session value less the No SWR one, in
-the sessions where both have a value) by ``shared_statistics.estimand_summary``:
-session -> recording day -> animal, the animal-balanced estimate with its
-nested bootstrap interval, the animals with its sign and the day-level test.
-The estimates are on the log scale (a log rate ratio).
+The support of a window contrast (Q1, Q2, Q2-onset; ``visit_rate.window_support``,
+read in parts of at most 2 s) is recorded beside each value: the fewest
+visits and at-risk seconds of each outcome over the parts it reads, and
+``supported``. A value whose window lacks support is not a number (the
+twenty-sixth round: "reported as unsupported"): its estimate, standard error
+and band are NaN, its row and counts are kept, and the reduction over units
+counts it (``n_units_unsupported``).
 
-Model D's curve over lags 1 to 10 is described, not tested: per session with
-its simultaneous band (``bands.simultaneous_band``), and the animal-balanced
-curve across sessions with its band (``bands.across_session_band``).
+Over units, each estimand is summarized for each kind and for the difference
+(the window tests Q2 and Q2-onset only at the animal unit, where they are
+declared tests: ``visit_rate.is_declared_test``)
+between the kinds (the SWR unit value less the No SWR one, unit by unit, over
+the units where both kinds have a supported value) by
+``regression.units.unit_summary`` at the records' ``fit_by`` (design note
+``docs/design/2026-11-24-unit-of-fit.md``, section 7). Values of records of
+different units are refused. The estimates are on the log scale (a log rate
+ratio).
 
-Q7a from a fit with the third clock (``f_m``) is the drop before leaving
-conditional on the time until the end of the immobile stretch: in a visit's
-last stretch the two clocks are equal, so part of a drop before leaving can
-move to ``f_m``. :func:`third_clock_q7a` sets Q7a of the fits with and
-without ``f_m`` side by side.
+The difference curve of the by-outcome form (the log rate ratio after a reward
+against after an omission over the time since arrival) is shown, not tested:
+per unit with its simultaneous band (``bands.simultaneous_band``), and across
+units with its band (``bands.across_session_band``, one row per unit). So is
+model D's curve over lags 1 to 10.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import NamedTuple
+import dataclasses
+import hashlib
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -40,43 +54,65 @@ from continuum_swr_replay.analysis.regression.bands import (
 from continuum_swr_replay.analysis.regression.contrasts import evaluate_contrast
 from continuum_swr_replay.analysis.regression.newton import CONVERGED
 from continuum_swr_replay.analysis.regression.record import FitRecord
-from continuum_swr_replay.analysis.shared_statistics import estimand_summary
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.analysis.regression.units import unit_summary
+from continuum_swr_replay.tables.session_keys import (
+    SESSION_COLUMNS,
+    FitBy,
+    fit_by_columns,
+)
 
 from ..declared_tests import DIFFERENCE, KINDS
 from .visit_rate import (
     LAGS,
-    STRETCH,
+    WINDOW_SUPPORT,
+    WINDOW_TESTS,
     VisitRateFit,
+    VisitRateSettings,
     declared_contrasts,
+    difference_curve_rows,
+    difference_grid,
+    is_declared_test,
     lag_curve_rows,
 )
 
 __all__ = [
+    "difference_curve_band",
+    "difference_curves",
     "lag_curve_band",
     "lag_curves",
-    "session_estimands",
+    "settings_id",
     "summarize_estimands",
-    "third_clock_q7a",
-    "ThirdClockQ7a",
+    "unit_estimands",
 ]
 
+#: The key columns of every unit table: the record's key (``""`` where the
+#: unit has no such part, ``FitRecord``) and the unit of the fit.
+_KEY = (*SESSION_COLUMNS, "fit_by")
 
-def _session_records(fit: VisitRateFit) -> list[FitRecord]:
-    """The fit's records, each of one session.
+
+def _records(fit: VisitRateFit) -> list[FitRecord]:
+    """The fit's records, each of the fit's unit.
 
     Raises
     ------
     ValueError
-        If a record is of a larger unit (``fit_by`` not ``"session"``): these
-        statistics key a record by its session and reduce it as a session.
+        If a record is of another unit than ``fit.settings.fit_by``.
     """
-    larger = sorted({r.fit_by for r in fit.records} - {"session"})
-    if larger:
+    other = sorted({r.fit_by for r in fit.records} - {fit.settings.fit_by})
+    if other:
         raise ValueError(
-            f"records with fit_by {larger}: these statistics read per-session fits only"
+            f"records with fit_by {other} in a fit by {fit.settings.fit_by!r}"
         )
     return list(fit.records)
+
+
+def _key(record: FitRecord) -> dict[str, str]:
+    return {
+        "animal": record.animal,
+        "session_date": record.session_date,
+        "epoch": record.epoch,
+        "fit_by": record.fit_by,
+    }
 
 
 def _kept(record: FitRecord) -> bool:
@@ -84,8 +120,26 @@ def _kept(record: FitRecord) -> bool:
     return record.status == CONVERGED and not record.no_fit
 
 
-def session_estimands(fit: VisitRateFit) -> pd.DataFrame:
-    """Q1, Q2 and Q7a in each session of model A's fit, with their variance.
+def _support_columns(record: FitRecord, estimand_id: str) -> dict:
+    """The window support beside one value: ``supported`` and, for each
+    outcome the contrast reads, its fewest visits and at-risk seconds over
+    the windows it reads (NaN where it reads none)."""
+    entry = record.cohort_counts.get(WINDOW_SUPPORT, {}).get(estimand_id)
+    out = {"supported": True if entry is None else bool(entry["supported"])}
+    for level, name in ((0, "omitted"), (1, "rewarded")):
+        reads = (
+            []
+            if entry is None
+            else [r for r in entry["reads"] if r["outcome"] == level]
+        )
+        out[f"visits_{name}"] = min((r["visits"] for r in reads), default=np.nan)
+        out[f"at_risk_s_{name}"] = min((r["at_risk_s"] for r in reads), default=np.nan)
+    return out
+
+
+def unit_estimands(fit: VisitRateFit) -> pd.DataFrame:
+    """Each estimand of model A's form in each unit of the fit, with its
+    variance and, for a window contrast, its support.
 
     Parameters
     ----------
@@ -95,137 +149,223 @@ def session_estimands(fit: VisitRateFit) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        One row per session and estimand: ``animal``, ``session_date``,
-        ``epoch``, ``kind``, ``estimand_id``, ``estimate``, ``variance`` and
-        ``se``; NaN for a session without a kept fit or with a coefficient
-        the contrast uses left out. With the third clock in the model, Q7a is
-        conditional on it (module docstring).
+        One row per unit and estimand: ``animal``, ``session_date``,
+        ``epoch`` (``""`` for a part the unit lacks), ``fit_by``, ``kind``,
+        ``settings`` (:func:`settings_id`),
+        ``estimand_id``, ``estimate``, ``variance``, ``se`` (NaN where the
+        window lacks support); ``supported`` (False for a window contrast
+        without support; True otherwise) and
+        ``visits_omitted``, ``visits_rewarded``, ``at_risk_s_omitted``,
+        ``at_risk_s_rewarded`` (``visit_rate.window_support``; NaN where not
+        read). NaN for a unit without a kept fit or with a coefficient the
+        contrast uses left out.
     """
     if fit.model != "A":
         raise ValueError(f"the declared estimands are model A's, not {fit.model}'s")
     c = declared_contrasts(fit.design, fit.settings)
     rows = []
-    for record in _session_records(fit):
+    for record in _records(fit):
         beta = np.asarray(record.coef, dtype=float)
         vcov = np.asarray(record.vcov, dtype=float)
         for estimand_id, contrast in c.items():
-            value = evaluate_contrast(contrast, beta, vcov) if _kept(record) else None
+            support = _support_columns(record, estimand_id)
+            value = None
+            if _kept(record) and support["supported"]:
+                on_fit = fit.design.contrast_on(contrast, record.coef_names)
+                value = evaluate_contrast(on_fit, beta, vcov)
             estimate = np.nan if value is None else value.estimate
             variance = np.nan if value is None else value.variance
             rows.append(
                 {
-                    "animal": record.animal,
-                    "session_date": record.session_date,
-                    "epoch": record.epoch,
+                    **_key(record),
                     "kind": fit.kind,
+                    "settings": settings_id(fit.settings),
                     "estimand_id": estimand_id,
                     "estimate": estimate,
                     "variance": variance,
                     "se": float(np.sqrt(variance)),
+                    **support,
                 }
             )
     return pd.DataFrame(rows)
 
 
-def _summary(values: pd.DataFrame, n_draws: int, seed: int) -> dict[str, float]:
-    """``estimand_summary`` of one estimand's session values (one per
-    session): day = recording day, session = epoch within it."""
-    values = values.reset_index(drop=True)
-    return estimand_summary(
-        values["estimate"],
-        values["animal"],
-        values["session_date"],
-        values["epoch"],
-        n_draws=n_draws,
-        seed=seed,
+def _canonical(value: object) -> object:
+    """A value in one form for each meaning: a number as a float, a mapping
+    as a tuple of its items sorted by key, a sequence as a tuple, a dataclass
+    as its fields by name; recursively."""
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return tuple(
+            (f.name, _canonical(getattr(value, f.name)))
+            for f in dataclasses.fields(value)
+        )
+    if isinstance(value, Mapping):
+        items = [(_canonical(k), _canonical(v)) for k, v in value.items()]
+        return ("mapping", tuple(sorted(items, key=repr)))
+    if isinstance(value, list | tuple):
+        return tuple(_canonical(v) for v in value)
+    if isinstance(value, bool | np.bool_):
+        return bool(value)
+    if isinstance(value, int | float | np.integer | np.floating):
+        return float(value)
+    return value
+
+
+def settings_id(settings: VisitRateSettings) -> str:
+    """A short fingerprint of a fit's settings, carried with each unit table
+    so that tables of other settings are not reduced together. It is
+    canonical (:func:`_canonical`): equal settings give one id however their
+    numbers are typed and their mappings ordered (the calibrated penalties
+    and their records included); settings that differ in any field differ."""
+    text = repr(_canonical(settings))
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def _fit_by(values: pd.DataFrame) -> FitBy:
+    """The one unit of a table's values.
+
+    Raises
+    ------
+    ValueError
+        If the values are of more than one unit of the fit.
+    """
+    units = sorted(set(values["fit_by"]))
+    if len(units) != 1:
+        raise ValueError(f"values of fit_by {units}: one unit of the fit at a time")
+    return units[0]
+
+
+def _indexed(values: pd.DataFrame, fit_by: FitBy, column: str) -> pd.Series:
+    """One value per unit, indexed by the unit's key (``unit_summary``)."""
+    columns = list(fit_by_columns(fit_by))
+    index = (
+        pd.Index(values[columns[0]].to_numpy(), name=columns[0])
+        if len(columns) == 1
+        else pd.MultiIndex.from_frame(values[columns])
     )
+    return pd.Series(values[column].to_numpy(dtype=float), index=index)
+
+
+def _summary(
+    values: pd.DataFrame, fit_by: FitBy, n_draws: int, seed: int
+) -> dict[str, float | str]:
+    """``unit_summary`` of one estimand's supported values (one per unit),
+    with the units whose value lacks support counted beside it. With no
+    supported finite value the summary is NaN, with no unit."""
+    supported = values["supported"].astype(bool).to_numpy()
+    kept = _indexed(values[supported], fit_by, "estimate")
+    if np.isfinite(kept.to_numpy()).any():
+        summary = unit_summary(kept, fit_by, n_draws=n_draws, seed=seed)
+    else:
+        summary = dict.fromkeys(_SUMMARY_NUMBERS, np.nan) | {
+            "n_animals": 0,
+            "n_animals_same_sign": 0,
+            "n_draws": n_draws,
+            "seed": seed,
+            "fit_by": fit_by,
+            "n_units": 0,
+        }
+    return {**summary, "n_units_unsupported": int((~supported).sum())}
+
+
+#: The entries of a summary that are NaN when no unit has a value.
+_SUMMARY_NUMBERS = ("estimate", "low", "high", "sd", "n_days", "n_sessions", "day_p")
 
 
 def summarize_estimands(
-    session_values: pd.DataFrame, *, n_draws: int, seed: int
+    unit_values: pd.DataFrame, *, n_draws: int, seed: int
 ) -> pd.DataFrame:
-    """Each estimand over sessions, for each kind and for their difference.
+    """Each estimand over the units, for each kind and for their difference.
 
     Parameters
     ----------
-    session_values : pd.DataFrame
-        :func:`session_estimands` of both kinds, concatenated.
+    unit_values : pd.DataFrame
+        :func:`unit_estimands` of both kinds, concatenated, of one unit of the
+        fit.
     n_draws, seed : int
-        The nested bootstrap's (``estimand_summary``), the same for every row.
+        The bootstrap's (``units.unit_summary``), the same for every row.
 
     Returns
     -------
     pd.DataFrame
         One row per estimand and tested (``SWR``, ``No SWR``, ``SWR minus No
-        SWR``): ``estimand_id``, ``tested`` and the entries of
-        ``estimand_summary`` (on the log scale). The difference is over the
-        sessions where both kinds have a value.
+        SWR``): ``estimand_id``, ``tested``, the entries of
+        ``unit_summary`` (on the log scale; with ``fit_by`` and ``n_units``)
+        and ``n_units_unsupported`` (the units whose value lacks window
+        support, left out; for the difference, the units where either kind
+        lacks it, and a unit that one kind lacks altogether). The difference is taken unit by unit, over the units where
+        both kinds have a supported value. The window tests (Q2
+        and the onset test) are declared tests per animal only
+        (``visit_rate.is_declared_test``, the twenty-sixth round): at another
+        unit they are left out here, and the unit table keeps their values
+        and support marks as a description.
 
     Raises
     ------
     ValueError
-        If a kind is missing, or a session has more than one value of an
-        estimand and kind.
+        If a kind is missing, the values are of more than one unit of the fit
+        or of more than one setting (:func:`settings_id`), or a unit has more
+        than one value of an estimand and kind.
     """
-    missing = set(KINDS) - set(session_values["kind"])
+    missing = set(KINDS) - set(unit_values["kind"])
     if missing:
-        raise ValueError(f"no session values of {sorted(missing)}")
-    keys = [*SESSION_COLUMNS, "estimand_id", "kind"]
-    if session_values.duplicated(keys).any():
-        raise ValueError("a session has more than one value of an estimand and kind")
+        raise ValueError(f"no unit values of {sorted(missing)}")
+    fit_by = _fit_by(unit_values)
+    settings = sorted(set(unit_values["settings"]))
+    if len(settings) != 1:
+        raise ValueError(
+            f"unit values of {len(settings)} settings: the kinds' fits must share "
+            "every setting (prior SD, penalties, Q1 reference, cap, form, unit)"
+        )
+    keys = [*_KEY, "estimand_id", "kind"]
+    if unit_values.duplicated(keys).any():
+        raise ValueError("a unit has more than one value of an estimand and kind")
     out = []
-    for estimand_id, values in session_values.groupby("estimand_id", sort=False):
+    for estimand_id, values in unit_values.groupby("estimand_id", sort=False):
+        if estimand_id in WINDOW_TESTS and not is_declared_test(estimand_id, fit_by):
+            continue
         for kind in KINDS:
-            summary = _summary(values[values["kind"] == kind], n_draws, seed)
+            summary = _summary(values[values["kind"] == kind], fit_by, n_draws, seed)
             out.append({"estimand_id": estimand_id, "tested": kind, **summary})
-        wide = values.pivot(
-            index=list(SESSION_COLUMNS), columns="kind", values="estimate"
+        estimate = values.pivot(index=list(_KEY), columns="kind", values="estimate")
+        supported = values.pivot(index=list(_KEY), columns="kind", values="supported")
+        wide = pd.DataFrame(
+            {
+                "estimate": estimate[KINDS[0]] - estimate[KINDS[1]],
+                "supported": supported[list(KINDS)]
+                .fillna(False)
+                .astype(bool)
+                .all(axis=1),
+            }
         ).reset_index()
-        wide["estimate"] = wide[KINDS[0]] - wide[KINDS[1]]
-        summary = _summary(wide, n_draws, seed)
+        summary = _summary(wide, fit_by, n_draws, seed)
         out.append({"estimand_id": estimand_id, "tested": DIFFERENCE, **summary})
     return pd.DataFrame(out)
 
 
-def lag_curves(fit: VisitRateFit, *, seed: int) -> pd.DataFrame:
-    """Model D's curve over lags in each session, with its simultaneous band.
-
-    Parameters
-    ----------
-    fit : VisitRateFit
-        Model D's fit of one kind.
-    seed : int
-        The band's seed (``bands.simultaneous_band``), the same in every
-        session.
-
-    Returns
-    -------
-    pd.DataFrame
-        One row per session and lag: the session, ``kind``, ``lag``,
-        ``estimate``, ``se``, ``low``, ``high`` and ``critical``. A session
-        without a kept fit, or with the curve left out, has NaN.
-    """
-    if fit.model != "D":
-        raise ValueError(f"the lag curve is model D's, not {fit.model}'s")
-    C = lag_curve_rows(fit.design)
+def _curve_rows(
+    fit: VisitRateFit, C: np.ndarray, grid: np.ndarray, name: str, seed: int
+) -> pd.DataFrame:
+    """One row per unit and grid point of the curve ``C @ beta`` with its
+    simultaneous band; NaN for a unit without a kept fit or with the curve
+    left out."""
     rows = []
-    for record in _session_records(fit):
+    for record in _records(fit):
+        C_fit = np.stack([fit.design.contrast_on(c, record.coef_names) for c in C])
         beta = np.asarray(record.coef, dtype=float)
-        used = np.any(C != 0.0, axis=0)
+        used = np.any(C_fit != 0.0, axis=0)
         if _kept(record) and np.isfinite(beta[used]).all():
-            band = simultaneous_band(C, beta, np.asarray(record.vcov), seed=seed)
+            band = simultaneous_band(C_fit, beta, np.asarray(record.vcov), seed=seed)
             values = (band.estimate, band.se, band.low, band.high, band.critical)
         else:
-            values = (*(np.full(len(LAGS), np.nan),) * 4, np.nan)
+            values = (*(np.full(grid.size, np.nan),) * 4, np.nan)
         estimate, se, low, high, critical = values
-        for j, lag in enumerate(LAGS):
+        for j, point in enumerate(grid):
             rows.append(
                 {
-                    "animal": record.animal,
-                    "session_date": record.session_date,
-                    "epoch": record.epoch,
+                    **_key(record),
                     "kind": fit.kind,
-                    "lag": lag,
+                    name: point,
                     "estimate": estimate[j],
                     "se": se[j],
                     "low": low[j],
@@ -236,10 +376,78 @@ def lag_curves(fit: VisitRateFit, *, seed: int) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def lag_curves(fit: VisitRateFit, *, seed: int) -> pd.DataFrame:
+    """Model D's curve over lags in each unit of the fit, with its
+    simultaneous band.
+
+    Parameters
+    ----------
+    fit : VisitRateFit
+        Model D's fit of one kind.
+    seed : int
+        The band's seed (``bands.simultaneous_band``), the same in every
+        unit.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per unit and lag: the unit's key, ``fit_by``, ``kind``,
+        ``lag``, ``estimate``, ``se``, ``low``, ``high`` and ``critical``. A
+        unit without a kept fit, or with the curve left out, has NaN.
+    """
+    if fit.model != "D":
+        raise ValueError(f"the lag curve is model D's, not {fit.model}'s")
+    grid = np.asarray(LAGS)
+    return _curve_rows(fit, lag_curve_rows(fit.design), grid, "lag", seed)
+
+
+def difference_curves(fit: VisitRateFit, *, seed: int) -> pd.DataFrame:
+    """The by-outcome form's difference curve in each unit of the fit, with
+    its simultaneous band: the outcome coefficient plus the arrival curve
+    after a reward less the one after an omission, the log rate ratio after a
+    reward at each time since arrival (``visit_rate.difference_curve_rows``,
+    on ``visit_rate.difference_grid``). Shown, not tested.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per unit and grid point: the unit's key, ``fit_by``,
+        ``kind``, ``time_since_arrival_s``, ``estimate``, ``se``, ``low``,
+        ``high`` and ``critical``; NaN for a unit without a kept fit or with
+        a coefficient the curve uses left out.
+    """
+    if fit.model != "A" or fit.settings.reward_form != "by_outcome":
+        raise ValueError("the difference curve is model A's by-outcome form's")
+    grid = difference_grid(fit.settings)
+    C = difference_curve_rows(fit.design, grid)
+    return _curve_rows(fit, C, grid, "time_since_arrival_s", seed)
+
+
+def _band(
+    curves: pd.DataFrame, point: str, points: Sequence, n_draws: int, seed: int
+) -> Band:
+    """The across-unit band of one kind's curves: one row per unit, with the
+    animal and the day (the recording day for a session or a day; the animal
+    itself for an animal) as ``across_session_band`` reads them."""
+    if curves["kind"].nunique() != 1:
+        raise ValueError("the curves of one kind")
+    fit_by = _fit_by(curves)
+    wide = curves.pivot(index=list(_KEY), columns=point, values="estimate")
+    wide = wide.reset_index()
+    day = wide["animal"] if fit_by == "animal" else wide["session_date"]
+    return across_session_band(
+        wide[list(points)].to_numpy(dtype=float),
+        wide["animal"].to_numpy(),
+        day.astype(str).to_numpy(),
+        n_draws=n_draws,
+        seed=seed,
+    )
+
+
 def lag_curve_band(
     curves: pd.DataFrame, *, n_draws: int, seed: int, lags: Sequence[int] = LAGS
 ) -> Band:
-    """The animal-balanced lag curve across sessions, with its band.
+    """The lag curve across units, with its band.
 
     Parameters
     ----------
@@ -254,98 +462,20 @@ def lag_curve_band(
     -------
     Band
     """
-    if curves["kind"].nunique() != 1:
-        raise ValueError("the curves of one kind")
-    wide = curves.pivot(
-        index=list(SESSION_COLUMNS), columns="lag", values="estimate"
-    ).reset_index()
-    return across_session_band(
-        wide[list(lags)].to_numpy(dtype=float),
-        wide["animal"].to_numpy(),
-        wide["session_date"].astype(str).to_numpy(),
-        n_draws=n_draws,
-        seed=seed,
-    )
+    return _band(curves, "lag", lags, n_draws, seed)
 
 
-class ThirdClockQ7a(NamedTuple):
-    """Q7a of model A with and without the third clock (:func:`third_clock_q7a`).
-
-    Attributes
-    ----------
-    sessions : pd.DataFrame
-        One row per session: the session, ``kind``, ``with_stretch``,
-        ``without_stretch`` (Q7a of each fit) and ``difference`` (with less
-        without); NaN where either fit has no value.
-    summary : pd.DataFrame
-        One row per ``value`` (``with_stretch``, ``without_stretch``,
-        ``difference``): ``estimand_summary`` of the session values.
-    """
-
-    sessions: pd.DataFrame
-    summary: pd.DataFrame
-
-
-def third_clock_q7a(
-    with_stretch: VisitRateFit,
-    without_stretch: VisitRateFit,
-    *,
-    n_draws: int,
-    seed: int,
-) -> ThirdClockQ7a:
-    """Q7a of model A's fits with and without ``f_m``, per session and over
-    sessions, stored beside the third clock's rule.
-
-    The rule (``visit_rate.third_clock_decision``) reads the concurvity only;
-    the difference here shows how much of the drop before leaving moves to
-    ``f_m`` when it is in the model.
+def difference_curve_band(curves: pd.DataFrame, *, n_draws: int, seed: int) -> Band:
+    """The difference curve across units, with its band
+    (``bands.across_session_band``, one row per unit), on the grid of
+    :func:`difference_curves`.
 
     Parameters
     ----------
-    with_stretch, without_stretch : VisitRateFit
-        Model A's fits of one kind, with and without the stretch clock, on
-        the same sessions.
+    curves : pd.DataFrame
+        :func:`difference_curves` of one kind.
     n_draws, seed : int
-        The nested bootstrap's (``estimand_summary``).
-
-    Returns
-    -------
-    ThirdClockQ7a
-
-    Raises
-    ------
-    ValueError
-        If a fit is not model A's, the fits differ in kind or sessions, or
-        the stretch clock is not in the first fit alone.
+        As ``bands.across_session_band`` takes them.
     """
-    if with_stretch.model != "A" or without_stretch.model != "A":
-        raise ValueError("Q7a is model A's")
-    if with_stretch.kind != without_stretch.kind:
-        raise ValueError("the two fits are of different kinds")
-    if not (
-        with_stretch.settings.include_stretch_clock
-        and not without_stretch.settings.include_stretch_clock
-    ):
-        raise ValueError(f"the first fit holds {STRETCH}, the second does not")
-    keys = list(SESSION_COLUMNS)
-    values = {}
-    for name, fit in (
-        ("with_stretch", with_stretch),
-        ("without_stretch", without_stretch),
-    ):
-        q7a = session_estimands(fit)
-        values[name] = q7a[q7a["estimand_id"] == "Q7a"].set_index(keys)["estimate"]
-    if not values["with_stretch"].index.equals(values["without_stretch"].index):
-        raise ValueError("the two fits are of different sessions")
-    sessions = pd.DataFrame(values)
-    sessions["difference"] = sessions["with_stretch"] - sessions["without_stretch"]
-    sessions = sessions.reset_index()
-    sessions.insert(len(keys), "kind", with_stretch.kind)
-    summary = [
-        {
-            "value": name,
-            **_summary(sessions.rename(columns={name: "estimate"}), n_draws, seed),
-        }
-        for name in ("with_stretch", "without_stretch", "difference")
-    ]
-    return ThirdClockQ7a(sessions, pd.DataFrame(summary))
+    grid = sorted(curves["time_since_arrival_s"].unique())
+    return _band(curves, "time_since_arrival_s", grid, n_draws, seed)

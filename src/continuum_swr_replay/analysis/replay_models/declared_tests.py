@@ -19,7 +19,10 @@ given:
 - :class:`SDChangeContrast`: the curve at the pooled mean plus half a pooled
   standard deviation of its variable less the curve at the mean less half,
   the mean and SD taken on the stated role's rows (a change per pooled SD);
-- :class:`CoefficientContrast`: a sum of named coefficients less another sum.
+- :class:`CoefficientContrast`: a sum of named coefficients less another sum;
+- :class:`OutcomeWindowContrast`: a coefficient plus the mean over a window
+  of one curve less another, on the same grid (the rate model's reward
+  effect read from an arrival curve for each outcome).
 
 Names. Terms and coefficients are named as
 :mod:`continuum_swr_replay.analysis.regression.terms` names a design's (the rule is
@@ -32,10 +35,12 @@ carries ``:role=<level>``. The rate models' clocks are
 ``log_trials_since_last_visit``, a smooth on the other-leaf rows only (the
 current arm is always 1 trial since its last visit and the previous arm 2, so
 on their rows a recency curve is their role level); the last outcome is
-``last_outcome_rewarded`` (0/1).
+``last_outcome_rewarded`` (0/1), and the arrival curve after each outcome is
+``s(time_since_visit_start_s):last_outcome_rewarded=<0 or 1>``.
 
-Models: ``visit_rate_A`` (the visit rate with the smooths of both clocks and
-the last outcome, 0/1); ``role_content`` (content on nine arms by arm role:
+Models: ``visit_rate_A`` (the visit rate, its declared form: an arrival curve
+for each last outcome, the shared leaving curve and the outcome coefficient,
+0/1; the convention's twenty-sixth round); ``role_content`` (content on nine arms by arm role:
 role category, reward-fraction smooth per role, value slope per role, recency
 smooth, the current role's smooth of time until leaving); ``role_content_uncertainty``
 (the same plus, per leaf role, the belief variance, the sample count and the
@@ -57,10 +62,13 @@ __all__ = [
     "DIFFERENCE",
     "ESTIMANDS",
     "KINDS",
+    "ONSET_WINDOW_S",
+    "Q2_WINDOW_S",
     "TESTED",
     "CoefficientContrast",
     "CurveContrast",
     "Estimand",
+    "OutcomeWindowContrast",
     "SDChangeContrast",
     "estimand",
 ]
@@ -133,6 +141,33 @@ class CoefficientContrast:
 
 
 @dataclass(frozen=True)
+class OutcomeWindowContrast:
+    """A coefficient plus the mean over ``window`` of one curve less another.
+
+    For the rate model: the outcome coefficient plus the mean over the window
+    of the arrival curve after a reward less the one after an omission, the
+    log rate ratio after a reward against after an omission at the same time
+    since arrival (and before leaving), averaged over the window on the grid
+    of ``contrasts.range_grid``. The window must lie inside both curves'
+    range.
+
+    Attributes
+    ----------
+    coefficient : str
+        The outcome coefficient.
+    plus_term, minus_term : str
+        The two smooth terms, of the same variable.
+    window : tuple of float
+        ``(lo, hi)`` in that variable (s since arrival).
+    """
+
+    coefficient: str
+    plus_term: str
+    minus_term: str
+    window: tuple[float, float]
+
+
+@dataclass(frozen=True)
 class Estimand:
     """One member of the declared family.
 
@@ -146,7 +181,7 @@ class Estimand:
         The estimand, in words.
     model : str
         The model it is read from.
-    contrast : CurveContrast or SDChangeContrast or CoefficientContrast
+    contrast : CurveContrast, SDChangeContrast, CoefficientContrast or OutcomeWindowContrast
         Its definition on the model's coefficients.
     scale : {"log rate ratio", "log share ratio"}
         What the contrast is on the model's link scale.
@@ -156,21 +191,36 @@ class Estimand:
     question: str
     description: str
     model: str
-    contrast: CurveContrast | SDChangeContrast | CoefficientContrast
+    contrast: (
+        CurveContrast | SDChangeContrast | CoefficientContrast | OutcomeWindowContrast
+    )
     scale: Literal["log rate ratio", "log share ratio"]
 
 
 BASELINES: dict[str, tuple[str, ...]] = {
     "visit_rate_A": ("(Intercept)",),
+    "visit_rate_D": ("(Intercept)",),
     "role_content": ("candidate_arm",),
     "role_content_uncertainty": ("candidate_arm",),
     "role_content_next": ("candidate_arm",),
 }
 """Each declared model's baseline terms, copied for each session in a fit of
-several sessions (``regression.terms``, "Baselines"): the rate model's
-intercept, the content models' arm category. No declared contrast reads one."""
+several sessions (``regression.terms``, "Baselines"): the rate models'
+intercept (model D's too, which has no declared test), the content models'
+arm category. No declared contrast reads one."""
 
-_ARRIVAL = "s(time_since_visit_start_s)"
+_OMITTED_ARRIVAL = "s(time_since_visit_start_s):last_outcome_rewarded=0"
+_REWARDED_ARRIVAL = "s(time_since_visit_start_s):last_outcome_rewarded=1"
+_OUTCOME = "last_outcome_rewarded"
+
+Q2_WINDOW_S: tuple[float, float] = (4.0, 10.0)
+"""Q2's window, s since arrival (the twenty-sixth round): the reward effect on
+the rate once events are going. Declared before any real arrival curve by
+outcome was looked at; never moved to fit the data."""
+
+ONSET_WINDOW_S: tuple[float, float] = (2.0, 4.0)
+"""The onset test's window, s since arrival (the twenty-sixth round): the
+reward effect on when events start. Declared as :data:`Q2_WINDOW_S` is."""
 _LEAVING = "s(time_until_visit_end_s)"
 _RECENCY = "s(log_trials_since_last_visit):role=other_leaf"
 
@@ -178,18 +228,34 @@ ESTIMANDS: tuple[Estimand, ...] = (
     Estimand(
         "Q1",
         "Does the rate of event starts change over the time at a well?",
-        "log rate 2 to 4 s after arrival minus log rate in the first second",
+        "log rate 2 to 4 s after arrival minus log rate in the first second, "
+        "read from the arrival curve after an omission",
         "visit_rate_A",
-        CurveContrast(_ARRIVAL, (2.0, 4.0), (0.0, 1.0)),
+        CurveContrast(_OMITTED_ARRIVAL, (2.0, 4.0), (0.0, 1.0)),
         "log rate ratio",
     ),
     Estimand(
         "Q2",
-        "Does the outcome just received change the rate?",
-        "log rate ratio, rewarded against omitted last outcome, at fixed time "
-        "before leaving",
+        "Does the outcome just received change the rate once events are going?",
+        "log rate ratio, rewarded against omitted last outcome, at the same time "
+        "since arrival and before leaving, averaged over 4 to 10 s after arrival, "
+        "among visits that last into the window",
         "visit_rate_A",
-        CoefficientContrast(plus=("last_outcome_rewarded",)),
+        OutcomeWindowContrast(
+            _OUTCOME, _REWARDED_ARRIVAL, _OMITTED_ARRIVAL, Q2_WINDOW_S
+        ),
+        "log rate ratio",
+    ),
+    Estimand(
+        "Q2-onset",
+        "Does the outcome just received change when events start?",
+        "log rate ratio, rewarded against omitted last outcome, at the same time "
+        "since arrival and before leaving, averaged over 2 to 4 s after arrival, "
+        "among visits that last into the window",
+        "visit_rate_A",
+        OutcomeWindowContrast(
+            _OUTCOME, _REWARDED_ARRIVAL, _OMITTED_ARRIVAL, ONSET_WINDOW_S
+        ),
         "log rate ratio",
     ),
     Estimand(

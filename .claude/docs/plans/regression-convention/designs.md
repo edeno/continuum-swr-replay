@@ -309,7 +309,7 @@ The visit at-risk bin design (Phase 3 builds it; Phase 5a fits it). Per session 
 - Reward covariates per bin: the last known outcome and the last ten known outcomes at the bin's time, with
   the existing outcome-boundary shift (the outcome of the current trial becomes lag 1 at
   `outcome_known_time_s`; `per_bin_design.py:85-91`, `_OUTCOME_SHIFT_STOP_COLUMNS`).
-- Model A: `count ~ offset(log exposure) + f_s(s) + f_u(u) [+ f_m(m)] + last_outcome_rewarded`.
+- Model A: `count ~ offset(log exposure) + f_s(s) + f_u(u) [+ f_m(m)] + last_outcome_rewarded`. *(Decided 2026-11-26, lead: "no just two": the rate model has two clocks; the third clock and its rule left the model.)*
   Model D: the same with the model D functional in place of the 0/1 term, on bins with ten known lags.
   `f_m` stays only if the collinearity rule separates it from `f_u` (design 4.1, "to try").
 

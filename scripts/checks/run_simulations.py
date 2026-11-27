@@ -34,7 +34,7 @@ and the configuration is in its ``attrs`` (``config``).
     python scripts/checks/run_simulations.py --model declared_penalty \\
         --workers 6 --output-dir OUT
     python scripts/checks/run_simulations.py --model visit_rate \\
-        --config swr_edf6.json --workers 16 --output-dir OUT
+        --config swr_by_outcome.json --workers 6 --output-dir OUT
 """
 
 from __future__ import annotations

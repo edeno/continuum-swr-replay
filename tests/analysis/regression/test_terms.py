@@ -764,3 +764,39 @@ def test_a_contrast_on_a_unit_fit() -> None:
     assert design.baseline_read(np.array([1.0, 0.0, 0.0])) == [INTERCEPT]
     with pytest.raises(ValueError, match="reads the baseline"):
         design.contrast_on(np.array([1.0, 1.0, 0.0]), unit.coef_names)
+
+
+def test_a_smooth_centered_on_declared_points() -> None:
+    """With ``center_on``, a smooth's sum-to-zero constraint is computed on
+    the basis at those points, not on the pooled rows: the curve sums to zero
+    over the points, for each level of a ``by``. Without it nothing changes;
+    points outside the range are refused."""
+    rng = np.random.default_rng(0)
+    rows = pd.DataFrame(
+        {"t": rng.uniform(0.0, 3.0, 200), "g": rng.integers(0, 2, 200).astype(float)}
+    )
+    points = tuple(np.linspace(4.0, 10.0, 61))
+    by = Category("g", (0, 1), 0, "none")
+    centered = build_design(
+        [Smooth("t", 0.0, 20.0, 12, 1.0, by=by, center_on=points)],
+        rows,
+        intercept=True,
+    )
+    plain = build_design([Smooth("t", 0.0, 20.0, 12, 1.0, by=by)], rows, intercept=True)
+    for level in (0, 1):
+        name = f"s(t):g={level}"
+        columns = centered.by_name[name].columns
+        at = pd.DataFrame({"t": points, "g": float(level)})
+        np.testing.assert_allclose(
+            centered.build(at).X[:, columns].sum(axis=0), 0.0, atol=1e-10
+        )
+        on = (rows["g"] == level).to_numpy()
+        plain_columns = plain.by_name[name].columns
+        np.testing.assert_allclose(
+            plain.build(rows).X[on][:, plain_columns].sum(axis=0), 0.0, atol=1e-8
+        )
+    # The default is the pooled rows, as before the option.
+    again = build_design([Smooth("t", 0.0, 20.0, 12, 1.0, by=by)], rows, intercept=True)
+    np.testing.assert_array_equal(plain.build(rows).X, again.build(rows).X)
+    with pytest.raises(ValueError, match="center_on"):
+        Smooth("t", 0.0, 20.0, 12, 1.0, center_on=(25.0,))

@@ -15,11 +15,11 @@ is [2026-11-20-regression-convention-and-figure04.md](2026-11-20-regression-conv
 | `newton.py` | the penalized Newton fit at fixed penalty strengths: a host loop around a JAX iteration kernel |
 | `reml.py` | the REML score with exact derivatives, pooled over sessions, and the penalty search (the score at a fit, `A^-1` and the edf in JAX) |
 | `pspline.py` | the cubic B-spline basis on fixed, equally spaced knots, its second-order difference penalty and the sum-to-zero constraint |
-| `terms.py` | the model terms, the design they build on the pooled rows, the names of terms and coefficients, the standardization and the design check |
+| `terms.py` | the model terms, the design they build on the pooled rows (a smooth's constraint on those rows or on declared points, `center_on`), the names of terms and coefficients, the standardization and the design check |
 | `collinearity.py` | how well the other terms explain each term, on the weighted design |
 | `support.py` | the support rule (the row rule for an inactive level is applied in `sessions.py`) and the guard that a tested coefficient carries a penalty |
 | `sessions.py` | the fitting loop, one fit for each unit of the fit, and the row rule for an inactive level |
-| `calibration.py` | the declared log penalty of a per-session smooth: the one at which its median edf over the sessions is a target |
+| `calibration.py` | the declared log penalty of a smooth: the one at which its median edf over the units of the fit (`fit_by`) is a target |
 | `record.py` | the fit-row record (one per unit of the fit, with its sessions) and the closed set of causes of a fit not kept |
 | `contrasts.py` | scalar estimands as linear functionals of a fit, with their exact variance |
 | `folds.py` | the one fold rule |
@@ -617,13 +617,13 @@ median of its rows and 5 have a row below it; a constant column fails. The units
 rule are in the module docstring. No share of sessions failing the rule drops a term
 from the model (the function that computed it, `terms_failing_share`, was never called and
 was removed on 2026-11-24); the constant `MAX_FAILING_SHARE` remains, because the penalty
-search and the rate model's third-clock decision (`visit_rate.third_clock_decision`) read
-it.
+search reads it (the rate model's third-clock decision read it too until the third clock
+left the model, 2026-11-26).
 A smooth and a lag functional have no counts; every term is judged by the design check.
 A smooth or a lag functional whose columns are zero on every row of a session (a smooth by
-a level the session has no rows of, as visit-rate model A's time-varying reward smooth in
-a session without a rewarded visit) fails the support rule there and is inactive, as a
-slope by that level is. Before, its columns escaped the design check (which measures only
+a level the session has no rows of, as visit-rate model A's arrival curve after an
+omission in a unit without an omission visit) fails the support rule there and is
+inactive, as a slope by that level is. Before, its columns escaped the design check (which measures only
 sizes above zero) and the first fit found the design not identified, an error that
 stopped the whole loop (`test_sessions.py::test_a_smooth_by_a_level_a_session_lacks_fails_its_support`).
 A smooth by a level the session has rows of, however few, stays in the fit: see
@@ -694,6 +694,70 @@ A unit of one session is the per-session fit, bit for bit: the stored per-sessio
 references pass unedited (`scripts/checks/_regression_reference.py::_records` checks that
 `fit_by` is `"session"` and that `sessions` repeats the record's own session before it
 leaves the two fields out of the comparison).
+
+**The rate model's use of the loop** (`analysis/replay_models/rate/visit_rate.py`, built
+2026-11-26). `VisitRateSettings.fit_by` holds one unit for each run: a value of
+`fit_by.BEHAVIOR_FIT_BY` (the day, the default, or the animal; the twenty-fourth round),
+or the session, the earlier design, for the validation and comparison. The intercept is
+the baseline of models A and D (`declared_tests.BASELINES`), so each session keeps its
+own intercept and every other term is shared in the unit: the clock curves, the reward
+terms and model D's lag curve. Whose this is: the formula the lead agreed to in the
+twenty-sixth round has the session as an intercept only and no curve by session; that the
+clock curves are shared in the unit is the author's reading of that formula and of the
+twenty-fourth round, not the lead's words (the follow-up simulation supports it: per-session
+curves were the worst form; `2026-11-24-unit-of-fit.md`, section 11.4). A unit's record holds its sessions' cohort counts, summed
+(a nested count summed by its keys, a flag kept once). Model D's identifiability is
+judged on the unit's rows, with each session's intercept (`visit_rate.lag_curve_counts`):
+a session whose outcomes are all the same cannot identify the lag curve alone, but it can
+inside a day whose other sessions vary. The model has two clocks, the time since arrival
+and the time until leaving (lead, 2026-11-26: "no just two"), and
+`calibration.log_penalty_for_edf(..., fit_by=)` takes the median edf over the units' fits.
+At `fit_by="session"` every record of the coefficient form and of model D equaled master's
+(70a64c42) field by field, with master's third clock (proved before it left the model).
+
+The reward effect's declared form (`reward_form="by_outcome"`, the twenty-sixth round) is
+two smooths of the arrival clock `by` the last outcome (`Smooth(..., by=Category(...),
+levels=(0,))` and `levels=(1,)`), each its own term with its own penalty block, beside the
+outcome slope (the weak penalty) and the shared leaving curve. Each arrival curve sums to
+zero over Q2's window grid (`Smooth(..., center_on=visit_rate.ARRIVAL_CENTER_S)`, the grid
+`OutcomeWindowContrast` averages over for 4 to 10 s; the coordinator's call, 2026-11-26), not
+over its outcome's pooled rows: so the outcome slope IS Q2, and the weak penalty (prior SD 2)
+sits on the tested log rate ratio, zero when the two curves are the same curve, as the
+twenty-fifth round puts it on "every simple tested coefficient". Each session's intercept is
+then the session's log rate after an omission at the window's mean of the arrival curve (and
+the leaving curve's pooled mean); it is unpenalized, so the fit is the same model up to where
+the weak penalty sits: at a prior SD of 100, where the window has support, Q1, Q2, Q2-onset,
+Q7a and the linear predictor equal those of the row-centered curves to 1e-6
+(`test_visit_rate.py::test_the_centering_moves_only_where_the_prior_sits`); in a unit without
+support Q2 itself agrees only to about 2e-3 (it is not a number there under the support
+rule). A unit's Q2 no longer moves when other sessions join the pooled design. Where a unit's
+rows after an omission do not reach 4 to 10 s, the weak penalty acts on an extrapolated
+quantity: it holds most of the outcome coefficient (its edf about 0.2 to 0.6 instead of 0.99),
+about 0.4 to 0.9 edf moves into the omitted arrival curve's term (4.70 against 4.09 with the
+curves centered on the rows), and the other estimands move a little (at SD 2, Q1 by up to
+0.028 against a standard error of 0.54, the onset test by up to 0.016 against 0.28, Q7a by up
+to 0.018); in units with support nothing changes (edf equal to 3 decimals). These are the
+review's simulation numbers on synthetic rows (2026-11-26). So a calibration target for the
+omitted curve at the day unit means a slightly stiffer penalty than the same number meant
+with row centering; the declared-penalty step on the real rows must calibrate the day unit
+with this in view. The concurvity
+estimates of the arrival curves rose from about 0.01 to 0.02 to about 0.03 to 0.06, and the
+outcome slope's VIF moved from 1.3 to 2.3 (animal) and 3.2 to 2.3 (day), on two animals of the
+validation cohort: far below the thresholds, no check behaved differently. Without
+`center_on` a smooth is centered on its pooled rows, as before. The outcome slope and the two
+curves identify the difference curve `beta + f_1(s) - f_0(s)`; the declared window contrasts
+read it (`visit_rate.window_contrast`). In a unit with no visit after an
+omission the curve after an omission has zero columns and fails the support rule, the
+outcome slope fails it too, and the unit is fitted (no shared arrival curve is collinear
+with the other). With 1 to 4 such visits the slope fails and the curve stays: the known
+issue `docs/known_issues/smooth_by_a_thin_level.md`. The fitter keeps that curve; the rate
+model's window support rule (`visit_rate.window_support`; the author's rule, cut into parts of
+at most `SUPPORT_PART_S` = 2 s by the coordinator's call) asks for 5 visits of each outcome a
+contrast reads in every part of every range it reads, and a value without that support is NaN
+in the statistics (`visit_rate_statistics.unit_estimands`) and has no value in the simulation
+engine (`Model.support`, the cause `support`). So Q1, Q2 and the onset test have no value from
+a curve fitted on few visits or extrapolated over a part of a window that no visit reaches; the
+curve itself, and the difference curve that is shown, are not changed.
 
 A session's design is built once, on all its rows; one mask with one reason code per row
 removed says which rows are kept, and the kept rows' design is a slice. Measured on
@@ -936,7 +1000,15 @@ model needs its own columns, `table(result, simulation)`. The phase adds the mod
 `simulation` as `config` for a list of several runs) and writes `<model>.parquet` (or
 `<model>_<config stem>.parquet`) with the seed, the commit and each model's declared
 penalties in its `attrs`. The visit rate model's list is
-`analysis/replay_models/rate/visit_rate_simulation.py` (`--model visit_rate`). The first list is the declared-penalty
+`analysis/replay_models/rate/visit_rate_simulation.py` (`--model visit_rate`): one run
+fits the same draws at the session, the day and the animal (one model per unit and prior
+SD, `<fit_by>_sd<SD>`), in one reward form (the by-outcome form's declared tests, or the
+coefficient form's secondary value: the engine fits one design at a time), with each
+curve's penalty calibrated at the day and at the animal to a declared target edf of that
+unit (`CLOCK_TARGETS`, the author's settings, not validated) when `calibrate` is set; the
+session, kept for comparison, fits at the provisional per-session values. Its window truths
+(`visit_rate_scenarios.window_means`) are the plain means of the planted reward effect
+over each window, in closed form; `planted_unit` covers the rest. The first list is the declared-penalty
 check, `scripts/checks/simulate_declared_penalty.py` (a synthetic cohort; one model per
 target edf). Fixed-seed tables are stored in
 `tests/analysis/regression/data/numpy_reference/simulation_*.json`, so that a change of

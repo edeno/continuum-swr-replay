@@ -163,7 +163,8 @@ is design C of the 03:13 answer. A baseline is never tested and is never read by
 
 **OPEN (a), rate: are the clock curves shared inside the unit?** The model has two clocks that Q1 and
 Q7a test (arrival and leaving) and, by default, a third (time until the end of the immobile stretch;
-`VisitRateSettings.include_stretch_clock`). Two forms:
+`VisitRateSettings.include_stretch_clock`; *decided 2026-11-26, lead: "no just two": the third clock
+left the model*). Two forms:
 
 - *Shared curves.* The clock tests (Q1, Q7a) read the curves, so they gain from the unit only if the
   curves are shared. The risk: if sessions differ in their curves, a shared curve can push part of the
@@ -398,7 +399,12 @@ because it shows what the animal unit hides: the variation between days and a tr
    the rate clocks at a larger unit. *(Decided 2026-11-25, the twenty-sixth round of
    `2026-11-20-regression-convention-and-figure04.md`: an arrival curve for each outcome with a window
    contrast answers the later-onset problem at the animal unit, read over 4 to 10 s (Q2) and 2 to 4 s
-   (the onset); the leaving curve shared.)*
+   (the onset); the leaving curve shared.)* The formula the lead agreed to there, `outcome + session + s(arrival, by =
+   outcome) + s(leaving) + offset(log exposure)`, has the session as an intercept only and no curve by
+   session. That the clock curves are shared in the unit is the author's reading of that formula and of
+   the twenty-fourth round, not words of the lead; the follow-up simulation supports it (per-session
+   curves were the worst form, `design_d_trial/rate/followup/REPORT.md`, section 2). The code builds the
+   shared curves (2026-11-26).
 2. Which target the paper states when sessions differ (section 6): the two differ by about 5 to 10 % at
    the variation simulated.
 3. Which unit the paper's headline values come from, after both are fitted and compared.

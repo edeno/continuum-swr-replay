@@ -268,6 +268,12 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
    units. Tests: `test_support.py::test_failing_share_over_units`, `test_calibration.py::test_median_over_units`
    (at `"animal"` with five animals, the median of five edfs; the bracket rule still raises when the
    median jumps).
+   **Built 2026-11-26 (branch `rate-reward-form`, 7b1811db):** `calibration.log_penalty_for_edf(...,
+   fit_by=)` fits each trial penalty at the unit and takes the median over the units' fits (its edf
+   series is indexed by the unit keys); `visit_rate.calibrate_log_penalty` passes the setting's unit;
+   the third clock's rule counts units (its records are units). Tests:
+   `test_calibration.py::test_median_over_units` (three animals of two sessions),
+   `test_visit_rate.py::test_calibration_at_the_unit` (and `::test_third_clock_rule_counts_units`, removed with the third clock). *(Decided 2026-11-26, lead: "no just two": the rate model has two clocks; the third clock and its rule left the model.)*
 5. **The reduction per unit.** One function, `regression.units.unit_summary(values, fit_by, *, n_draws,
    seed)` (first built in `shared_statistics`, moved into the fitter's package on 2026-11-24 because it
    knows the units): `"session"` is `estimand_summary`; `"day"` is `estimand_summary` with each day as its own
@@ -307,6 +313,18 @@ Each task is one implementer's PR-sized piece. Its gating tests are written firs
    `test_visit_rate.py::test_fit_by_from_the_one_setting` (the default is `BEHAVIOR_FIT_BY`),
    `::test_day_fit_has_one_intercept_per_session`, `::test_model_d_identified_on_the_unit`,
    `test_visit_rate_statistics.py::test_unit_estimands_at_each_unit`.
+   **Built 2026-11-26 (branch `rate-reward-form`, 7b1811db and ec2d6b68), with shared clock curves:**
+   `VisitRateSettings.fit_by` (default `BEHAVIOR_FIT_BY[0]`, the day; `"session"` kept); the
+   intercept is the baseline of models A and D (`BASELINES["visit_rate_D"]` added); a unit's record
+   holds its sessions' cohort counts summed; model D's identifiability is judged on the unit's rows
+   with each session's intercept (`visit_rate.lag_curve_counts`; `model_d_rows` keeps the bins with
+   ten known outcomes only); the statistics map each contrast by name (`Design.contrast_on`), reduce
+   with `unit_summary` and refuse values of mixed units (`visit_rate_statistics.unit_estimands`,
+   which replaces `session_estimands`). `clock_curves="per_session"` is not built (shared curves,
+   the twenty-fourth round as read). At `fit_by="session"` every record of the coefficient form
+   and of model D equals master's (70a64c42) field by field. The twenty-sixth round's reward form
+   (an arrival curve for each outcome) and its window tests were built on the same branch
+   (d464e255, ec2d6b68).
 9. **The content model reads the setting.** `RoleContentSettings.fit_by` and `arm_effects`
    (`"per_session"` or `"shared"`, question 2); the arm category is the baseline when per session; the
    collinearity and the statistics per unit; the calibration of the smooths over units;

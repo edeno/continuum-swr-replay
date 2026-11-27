@@ -235,7 +235,7 @@ def test_a_median_that_jumps_past_the_target_raises(rate_sessions, monkeypatch) 
     ends at the step, the median there is far from the target 4, and the
     calibration refuses it rather than return it."""
 
-    def step(design, sessions, lik, term, response, unit):
+    def step(design, sessions, lik, term, response, unit, fit_by):
         rho = design.log_penalties[design.by_name[term].block]
         return pd.Series(8.0 if rho < 3.0 else 2.0, index=pd.Index(list(sessions)))
 
@@ -243,3 +243,81 @@ def test_a_median_that_jumps_past_the_target_raises(rate_sessions, monkeypatch) 
     pooled = pd.concat(rate_sessions.values(), ignore_index=True)
     with pytest.raises(ValueError, match="differs from the target"):
         _calibrate(_design(pooled), rate_sessions, 4.0)
+
+
+def _by_animal(rate_sessions) -> dict[tuple[str, str, str], pd.DataFrame]:
+    """The six sessions as three animals of two sessions each."""
+    out = {}
+    for i, frame in enumerate(rate_sessions.values()):
+        frame = frame.assign(animal=f"sim{i // 2}")
+        out[tuple(frame.loc[0, ["animal", "session_date", "epoch"]])] = frame
+    return out
+
+
+def _baseline_design(pooled: pd.DataFrame, penalty: float = 2.0):
+    """:func:`_design` with the intercept declared as the baseline."""
+    return build_design(
+        [
+            Smooth("time_since_s", 0.0, 20.0, 12, penalty),
+            Slope("x", "none"),
+            Offset("exposure"),
+        ],
+        pooled,
+        intercept=True,
+        baseline=("(Intercept)",),
+    )
+
+
+def test_median_over_units(rate_sessions, monkeypatch) -> None:
+    """At ``fit_by="animal"`` the median is over the animals' fits: one edf
+    per animal, each the edf of that animal's fit at the returned penalty,
+    and the bracket rule still raises when the median jumps."""
+    sessions = _by_animal(rate_sessions)
+    pooled = pd.concat(sessions.values(), ignore_index=True)
+    design = _baseline_design(pooled)
+    found = log_penalty_for_edf(
+        design,
+        sessions,
+        Poisson(),
+        term=TERM,
+        target_edf=4.0,
+        response="count",
+        unit="well_visit_id",
+        fit_by="animal",
+    )
+    assert list(found.edf.index) == [("sim0",), ("sim1",), ("sim2",)]
+    assert found.n_sessions_used == 3
+    assert found.median_edf == pytest.approx(4.0, abs=0.01)
+    assert np.median(found.edf.to_numpy()) == found.median_edf
+    records = fit_sessions(
+        _baseline_design(pooled, found.log_penalty),
+        sessions,
+        Poisson(),
+        model="test",
+        kind="SWR",
+        response="count",
+        unit="well_visit_id",
+        table_sha256={},
+        fit_by="animal",
+    )
+    np.testing.assert_allclose(
+        [r.edf[TERM] for r in records], found.edf.to_numpy(), rtol=1e-10
+    )
+
+    def step(design, sessions, lik, term, response, unit, fit_by):
+        rho = design.log_penalties[design.by_name[term].block]
+        keys = pd.Index(sorted({key[:1] for key in sessions}))
+        return pd.Series(8.0 if rho < 3.0 else 2.0, index=keys)
+
+    monkeypatch.setattr(calibration, "_term_edf", step)
+    with pytest.raises(ValueError, match="differs from the target"):
+        log_penalty_for_edf(
+            design,
+            sessions,
+            Poisson(),
+            term=TERM,
+            target_edf=4.0,
+            response="count",
+            unit="well_visit_id",
+            fit_by="animal",
+        )

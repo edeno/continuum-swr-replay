@@ -42,12 +42,14 @@ def test_the_quick_list_runs_through_the_engine(quick, quick_result) -> None:
     summary = quick_result.summary
     assert list(dict.fromkeys(summary["scenario"])) == list(vs.SCENARIOS["SWR"])
     assert set(summary["model"]) == {"session_sd2"}
-    assert set(summary["estimand"]) == {"Q1", "Q1b", "Q2", "Q7a"}
+    assert set(summary["estimand"]) == {"Q1", "Q1b", "Q2", "Q2-onset", "Q7a"}
     assert (summary["share_not_converged"] == 0.0).all()
-    assert (summary["share_without_value"] == 0.0).all()
+    # A unit without a value lacks only the window support of a window read.
+    assert (summary["share_without_value"] == summary["without_value_support"]).all()
+    assert (summary.query("estimand == 'Q7a'")["share_without_value"] == 0.0).all()
     assert (summary["n_data_sets_with_estimate"] == 2).all()
     table = vs.table(quick_result, quick)
-    assert {"kind", "target_edf", "prior_sd", "truth_omission_side"} <= set(
+    assert {"kind", "reward_form", "calibrate", "prior_sd", "truth_by_outcome"} <= set(
         table.columns
     )
     assert quick.attrs["allow_provisional"] == "simulation"
@@ -64,15 +66,18 @@ def test_the_same_seed_gives_the_same_table(quick, quick_result) -> None:
 
 
 def test_the_planted_values(quick) -> None:
-    """A constant ratio is the truth of every level; a later onset has no
-    planted ratio; the differing ratios' session truth is the reduction of
-    the sessions' own ratios."""
+    """A constant ratio is the truth of every window and of the coefficient;
+    a later onset has no planted coefficient but real window truths; the
+    differing ratios' truth is the reduction of the sessions' own ratios."""
     truths = quick.attrs["truths"]
     log_ratio = vs.LOG_RATIO["SWR"]
-    for level in ("session", "omission_side"):
-        assert truths["constant_ratio"][level]["Q2"] == pytest.approx(log_ratio)
-        assert truths["no_effect"][level]["Q2"] == 0.0
-        assert np.isnan(truths["later_onset"][level]["Q2"])
+    coef = vr.SECONDARY_ESTIMAND
+    for name, value in (("constant_ratio", log_ratio), ("no_effect", 0.0)):
+        assert truths[name]["pooled"][coef] == pytest.approx(value)
+        for window in ("Q2", "Q2-onset"):
+            assert truths[name]["by_outcome"][window] == pytest.approx(value)
+    assert np.isnan(truths["later_onset"]["pooled"][coef])
+    assert truths["later_onset"]["by_outcome"]["Q2-onset"] > 0.0
     keys = pd.DataFrame(
         list(quick.sessions), columns=["animal", "session_date", "epoch"]
     )
@@ -80,10 +85,10 @@ def test_the_planted_values(quick) -> None:
         keys, mean=log_ratio, animal_sd=0.2, session_sd=0.3, seed=vs.DIFFERING_SEED
     )
     per_animal = pd.Series(ratios).groupby(level=0).mean()
-    assert truths["differing_ratio"]["session"]["Q2"] == pytest.approx(
+    assert truths["differing_ratio"]["by_outcome"]["Q2"] == pytest.approx(
         per_animal.mean()
     )
-    assert truths["drop_before_leaving"]["session"]["Q7a"] == pytest.approx(-vs.DROP)
+    assert truths["drop_before_leaving"]["by_outcome"]["Q7a"] == pytest.approx(-vs.DROP)
 
 
 def test_a_planted_coefficient_inside_the_model_is_recovered() -> None:
@@ -95,16 +100,21 @@ def test_a_planted_coefficient_inside_the_model_is_recovered() -> None:
     for a in range(5):
         for e in range(2):
             key = (f"animal{a}", f"2026{e + 1:04d}", "02_r1")
-            rows = vs.synthetic_visit_rows(key, n_visits=80, seed=100 + 2 * a + e)
+            rows = vs.synthetic_visit_rows(
+                key, n_visits=80, seed=100 + 2 * a + e, length_s=(1.5, 12.0)
+            )
             sessions[key] = rows
     pooled = pd.concat(sessions.values(), ignore_index=True)
-    models = vs._models("SWR", pooled, vs.Config(prior_sds=(2.0,)), None)
+    config = vs.Config(prior_sds=(2.0,), fit_by=("session",))
+    models = vs._models("SWR", pooled, config, {"session": None})
     seconds = np.mean([rows[vr.EXPOSURE].sum() for rows in sessions.values()])
     inside = InsideScenario(
         "inside", {"(Intercept)": float(np.log(2000.0 / seconds)), vr.REWARD: 0.6}
     )
     outside = OutsideScenario(
-        "outside", _constant, planted={"Q2": 0.6, "Q1": 0.0, "Q1b": 0.0, "Q7a": 0.0}
+        "outside",
+        _constant,
+        planted={"Q2": 0.6, "Q2-onset": 0.6, "Q1": 0.0, "Q1b": 0.0, "Q7a": 0.0},
     )
     result = engine.run(Simulation(models, sessions, [inside, outside], 4, 200, 3))
     table = result.summary.set_index(["scenario", "model", "estimand"])
@@ -163,3 +173,148 @@ def test_the_rate_table_truth_is_flagged_as_read_from_the_real_counts(
     assert flagged.loc["rate_table"].all()
     assert not flagged.drop(index="rate_table")["any"].any()
     assert list(quick.attrs["truth_from_real_counts"]["scenarios"]) == ["rate_table"]
+
+
+#: A small cohort of two sessions a day, for the units.
+SMALL = (3, 2, 2, 30, 120.0, (1.0, 12.0), (0.5, 12.0))
+
+
+@pytest.fixture(scope="module")
+def at_every_unit() -> Simulation:
+    return vs.simulation(
+        False,
+        1,
+        {"synthetic": SMALL, "n_data_sets": 2, "n_draws": 50, "prior_sds": (2.0,)},
+    )
+
+
+def test_models_at_each_unit_on_the_same_draws(at_every_unit) -> None:
+    """One model per unit (session, day, animal), named for it, of one
+    design; the engine fits each on the same data sets, and each unit's rows
+    are its fits."""
+    models = at_every_unit.models
+    assert [m.name for m in models] == ["session_sd2", "day_sd2", "animal_sd2"]
+    assert [m.fit_by for m in models] == ["session", "day", "animal"]
+    assert len({m.design.coef_names for m in models}) == 1
+    result = engine.run(at_every_unit, scenarios=["constant_ratio"])
+    units = result.sessions.groupby("model")["fit_by"].agg(["first", "size"])
+    n_estimands = len(models[0].estimands)
+    assert units.loc["session_sd2", "size"] == 12 * 2 * n_estimands
+    assert units.loc["day_sd2", "size"] == 6 * 2 * n_estimands
+    assert units.loc["animal_sd2", "size"] == 3 * 2 * n_estimands
+    summary = result.summary.set_index(["model", "estimand"])
+    assert summary.loc[("animal_sd2", "Q2"), "planted"] == pytest.approx(
+        vs.LOG_RATIO["SWR"]
+    )
+    assert np.isfinite(summary.loc[("animal_sd2", "Q2"), "planted_unit"])
+    table = vs.table(result, at_every_unit).set_index(["model", "estimand"])
+    assert table.loc[("animal_sd2", "Q2"), "declared_test"]
+    assert not table.loc[("day_sd2", "Q2"), "declared_test"]
+    assert not table.loc[("session_sd2", "Q2-onset"), "declared_test"]
+    assert table.loc[("day_sd2", "Q7a"), "declared_test"]
+    assert not table.loc[("animal_sd2", "Q1b"), "declared_test"]
+
+
+def test_the_window_truths_of_a_later_onset(at_every_unit) -> None:
+    """The later onset's window truths are the plain means over each window
+    of the planted difference ``f(s) - f(max(s - delay, 0))``, in closed
+    form: nonzero over 2 to 4 s, zero over 4 to 10 s (the planted arrival
+    curve is flat from 3 s); the coefficient has no truth (no ratio)."""
+    truth = at_every_unit.attrs["truths"]["later_onset"]
+
+    def difference(s):
+        s = np.asarray(s)
+        return vs.QUICK_CLOCKS.arrival(s) - vs.QUICK_CLOCKS.arrival(
+            np.maximum(s - vs.DELAY_S, 0.0)
+        )
+
+    for name, (lo, hi) in (("Q2", (4.0, 10.0)), ("Q2-onset", (2.0, 4.0))):
+        grid = np.linspace(lo, hi, round((hi - lo) * 100) + 1)
+        assert truth["by_outcome"][name] == pytest.approx(np.mean(difference(grid)))
+    assert truth["by_outcome"]["Q2"] == 0.0
+    assert truth["by_outcome"]["Q2-onset"] > 0.01
+    assert np.isnan(truth["pooled"][vr.SECONDARY_ESTIMAND])
+
+
+def test_the_coefficient_form_is_a_run_of_its_own() -> None:
+    """The secondary value's run: the coefficient form at each unit, its one
+    estimand, planted from the coefficient's projection."""
+    run = vs.simulation(
+        False,
+        1,
+        {
+            "synthetic": SMALL,
+            "reward_form": "coefficient",
+            "n_data_sets": 2,
+            "n_draws": 50,
+            "prior_sds": (2.0,),
+        },
+    )
+    assert {tuple(m.estimands) for m in run.models} == {(vr.SECONDARY_ESTIMAND,)}
+    constant = run.scenarios[vs.SCENARIOS["SWR"].index("constant_ratio")]
+    model = run.models[0]
+    assert engine.planted_value(
+        constant, model, vr.SECONDARY_ESTIMAND
+    ) == pytest.approx(vs.LOG_RATIO["SWR"])
+    with pytest.raises(ValueError, match="reward_form"):
+        vs.Config(reward_form="time_varying")
+
+
+def test_the_curves_are_calibrated_at_the_unit() -> None:
+    """Each curve of the form is calibrated at the unit to its target: the
+    median edf over the unit's fits (three animals) reaches the target, and
+    the record names the unit."""
+    cohort = vs._synthetic_cohort("SWR", SMALL)
+    settings = vr.VisitRateSettings(fit_by="animal")
+    targets = {
+        vr.OMITTED_ARRIVAL_TERM: 5.0,
+        vr.REWARDED_ARRIVAL_TERM: 5.0,
+        vr.LEAVING: 3.0,
+    }
+    found = vs.calibrate_clocks(
+        cohort, "SWR", settings, vs.QUICK_CLOCKS, {"rows": "synthetic"}, targets=targets
+    )
+    assert set(found) == {("SWR", c) for c in settings.curves("A")}
+    for (_, curve), penalty in found.items():
+        last = penalty.rows["rounds"][-1][curve]
+        assert penalty.target_edf == targets[curve]
+        assert last["median_edf"] == pytest.approx(targets[curve], abs=0.01)
+        assert last["n_units_used"] == 3
+        assert penalty.rows["fit_by"] == "animal"
+
+
+def test_the_engine_reads_the_window_support_rule() -> None:
+    """Visits after an omission of 2.5 to 5.9 s: Q2's 6 to 8 s part has no
+    row after an omission in any unit, so the engine reports every unit
+    without a value of Q2 for the cause ``support`` (the rule of
+    ``visit_rate.window_support``, the one the statistics read); the onset
+    test keeps a value in every unit."""
+    run = vs.simulation(
+        False,
+        1,
+        {
+            "synthetic": (3, 2, 2, 30, 120.0, (1.0, 12.0), (2.5, 5.9)),
+            "fit_by": ("day",),
+            "n_data_sets": 2,
+            "n_draws": 50,
+            "prior_sds": (2.0,),
+        },
+    )
+    assert all(m.support is not None for m in run.models)
+    summary = engine.run(run, scenarios=["constant_ratio"]).summary.set_index(
+        "estimand"
+    )
+    assert summary.loc["Q2", "without_value_support"] == 1.0
+    assert summary.loc["Q2", "share_without_value"] == 1.0
+    assert summary.loc["Q2-onset", "share_without_value"] == 0.0
+
+
+def test_the_drop_before_small_movements_is_in_the_list() -> None:
+    """The scenario of a drop before every small movement is in both kinds'
+    lists, last (so that the other scenarios keep their seeds), with Q7a
+    planted at 0."""
+    for kind in ("SWR", "No SWR"):
+        assert vs.SCENARIOS[kind][-1] == "drop_before_small_movements"
+    run = vs.simulation(True, 1)
+    truth = run.attrs["truths"]["drop_before_small_movements"]["by_outcome"]
+    assert truth["Q7a"] == 0.0 and truth["Q2"] == 0.0

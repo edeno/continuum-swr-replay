@@ -1073,6 +1073,7 @@ b. **The form of the rate model.** Diagnostics on the real at-risk bins (pooled;
    round). Open: the reference window of Q1; the flexibility (penalty) of the leaving clock, and of the
    other clocks; the reward effect as one coefficient or as a contrast of two arrival curves (whether it
    may change with time since arrival); whether the model covers a declared time range.
+   *(The third clock: decided 2026-11-26, the twenty-seventh round: two clocks, no third clock.)*
 c. *(Decided in the twenty-first round: float64 on CPU and GPU.)*
 d. *(Decided in the twenty-third round: the port goes ahead in the order given there; the acceptance rule
    has an absolute floor.)*
@@ -1219,6 +1220,49 @@ curve after an omission.
 This round changes the declared Q2, which was the one coefficient (`declared_tests.py`), and decides the
 open "form of the reward effect" of `visit_rate.REWARD_FORMS` and of item b above (whether the reward
 effect may change with time since arrival: it may, along the arrival clock only).
+
+**Built (2026-11-26, branch `rate-reward-form`; the author's note, not the lead's words).** The form
+is `visit_rate.REWARD_FORMS`' `"by_outcome"`, the default (`OMITTED_ARRIVAL_TERM`,
+`REWARDED_ARRIVAL_TERM`: each a smooth of the arrival clock `by` the last outcome, with its own
+penalty, each summing to zero over Q2's window grid, `ARRIVAL_CENTER_S`, so that the outcome
+coefficient is Q2 itself and the weak penalty sits on it: the coordinator's call); `"time_varying"` is removed and `"coefficient"` stays for the secondary value
+(`visit_rate.SECONDARY_ESTIMAND`, `"reward_coefficient"`). The two tests are `declared_tests` Q2
+(`Q2_WINDOW_S`, 4 to 10 s) and `Q2-onset` (`ONSET_WINDOW_S`, 2 to 4 s; the id is the author's, after
+the convention of `Q5b-var`), both `OutcomeWindowContrast`; Q1 reads the arrival curve after an
+omission. The support rule of a window (the author's rule, `visit_rate.window_support`, cut into parts
+by the coordinator's call): each range a contrast reads is cut into equal parts of at most
+`SUPPORT_PART_S` = 2 s (Q2: 4 to 6, 6 to 8, 8 to 10); for each part and each outcome the contrast
+reads, the unit's visits with a row there and their at-risk seconds; supported when every part has at
+least `support.MIN_UNITS` (5) visits. The counts are recorded per part; a value without support is
+NaN (its row and counts kept), counted by the reduction, and has no value in the simulation engine.
+The window tests are declared tests at the animal unit only (`visit_rate.WINDOW_TEST_UNIT`,
+`is_declared_test`); the summary leaves them out at another unit. The difference curve is
+`visit_rate_statistics.difference_curves`, with its bands.
+
+### Twenty-seventh round (lead, 2026-11-26, 19:15): the rate model has two clocks
+
+The question, as the coordinator put it to the lead: "The code has a third clock, the time until the end
+of the immobile stretch. It is on by default, with a rule that drops it when it cannot be separated from
+the others. Your decision record's formula has two clocks, and the `bam` simulations left the third one
+out. [...] Do you want the third clock in the model?"
+
+The lead's words: "no just two".
+
+What the lead decided: the rate model's clocks are the time since arrival and the time until leaving.
+What follows in the code (the coordinator's, not the lead's words): the third clock (the time until the
+end of the immobile stretch, `f_m`) and its drop rule (`visit_rate.third_clock_decision`) leave the model.
+The validation scenario of a drop before every small movement (`drop_before_small_movements`) stays: it
+checks the two-clock model on data it cannot represent (removed in e680cffd and restored on 2026-11-26).
+With two clocks, Q7a cannot tell a drop before leaving from a drop before any movement: a visit's last
+immobile stretch ends at the final poke-out, so the scenario measures how much of a drop before small
+movements Q7a reads as a drop before leaving.
+
+What it changes: the third-clock question of item b of "Open after the twenty-third round" and of the
+plan (`phase-5a-rate-models.md`, the rule for the third clock) is decided. The twenty-sixth round's formula
+already has two clocks. The change moves the rate model's results at every unit against any earlier run
+that had the third clock: the earlier scenario runs on master's default had it; the `bam` trials did not.
+The time-bin table keeps its column `time_until_stretch_end_s`; no model reads it now (the author's note:
+whether the table keeps it is for the lead).
 
 ## 10. Left to the builder
 

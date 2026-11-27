@@ -1035,3 +1035,39 @@ reports at `rate-validation-frozen-5d97fd98`. Paths are under `src/continuum_swr
 | `regression/simulation.Model.fit`, `fit_estimands`, `fit_columns`, `estimand_names`, `OwnFit`, `UNIT_COLUMNS`, `_own_units`, `_own_fit_rows`, and the own-fit tests of `tests/analysis/regression/test_simulation_engine.py` (removed) | not merged to master; reachable at the tag `rate-validation-with-joint-run-ae44dce8`. Master's engine at `fit_by` | 0f33f726 |
 | `replay_models/rate/visit_rate_simulation.PRIOR_SDS` `(1, 2, 4, 8)` | `(visit_rate.WEAK_PRIOR_SD, *visit_rate.WEAK_PRIOR_SD_SENSITIVITY)`, that is (2, 1, 4) | 817fa1b4 |
 | `shared_statistics.animal_mean_interval` (the branch's copy) | master's `shared_statistics.animal_mean_interval` (the same arithmetic, with an `sd` key) | 45565605 |
+
+## The rate model's reward effect, an arrival curve for each outcome, 2026-11-26
+
+The convention's twenty-sixth round decided the form of the rate model's reward effect: an arrival
+curve for each last outcome, read over declared windows. The form of a shared arrival curve plus a
+difference curve, `reward_form="time_varying"`, was decided against and is removed. Paths are under
+`src/continuum_swr_replay/analysis/replay_models/`.
+
+| Old place | New place | Commit |
+|---|---|---|
+| `rate/visit_rate.REWARD_FORMS` value `"time_varying"` and its branch of `model_terms` and `tested_terms` (removed) | `REWARD_FORMS` value `"by_outcome"`, the default: `OMITTED_ARRIVAL_TERM`, `REWARDED_ARRIVAL_TERM` (now the by-outcome form's curve after a reward), `ARRIVAL_BY_OUTCOME`, each curve at its own penalty | d464e255 |
+| `declared_tests` Q2 as `CoefficientContrast(plus=("last_outcome_rewarded",))` | Q2 as `OutcomeWindowContrast` over `Q2_WINDOW_S` (4 to 10 s); the new `Q2-onset` over `ONSET_WINDOW_S` (2 to 4 s); Q1 reads `s(time_since_visit_start_s):last_outcome_rewarded=0` | d464e255 |
+| the coefficient form's Q1, Q2 and Q7a (`visit_rate.declared_contrasts` of `reward_form="coefficient"`) | the coefficient form gives `visit_rate.SECONDARY_ESTIMAND` (`"reward_coefficient"`) only | d464e255 |
+| `rate/visit_rate_scenarios.Planted.omission_side` (Q2: the mean of the effect over the rewarded rows), `TRUTH_OF_FORM["time_varying"]` (removed) | `Planted.by_outcome` (Q1, Q7a, and Q2 and Q2-onset as the means of the effect over the windows, `window_means`, `WINDOWS`); `TRUTH_OF_FORM["by_outcome"]` | d464e255 |
+| `Planted.pooled`'s Q1, Q2 and Q7a | `Planted.pooled` holds the reward coefficient's projection alone, keyed `SECONDARY_ESTIMAND` | d464e255 |
+| the identification of model D's lag curve per session inside `rate/visit_rate.model_d_rows`, and its counts in `CohortRows.counts` | `visit_rate.lag_curve_counts`, judged on the rows of the unit of the fit at `fit_visit_rate`; the counts are in each record's `cohort_counts` | 7b1811db |
+| `rate/visit_rate._session_rows` | `visit_rate._unit_rows` (the sessions' rows and each unit's counts) | 7b1811db |
+| `rate/visit_rate_simulation` table columns `truth_session`, `truth_omission_side` | `truth_by_outcome`, `truth_pooled` | d464e255 |
+
+## The rate model's third clock removed, 2026-11-26
+
+The lead (2026-11-26, 19:15): "no just two". The rate model has two clocks. Paths are under
+`src/continuum_swr_replay/analysis/replay_models/rate/`. The time-bin table keeps `time_until_stretch_end_s`
+(`replay_models/visit_design.py`); no model reads it.
+
+| Old place | New place | Commit |
+|---|---|---|
+| `visit_rate.STRETCH`, `CLOCK_BASES[STRETCH]`, the stretch entries of `CLOCK_LOG_PENALTIES` (removed) | none: `VisitRateSettings.clocks()` is `(ARRIVAL, LEAVING)` | e680cffd |
+| `visit_rate.VisitRateSettings.include_stretch_clock` (removed) | none | e680cffd |
+| `visit_rate.third_clock_decision`, `ThirdClockDecision` (removed) | none | e680cffd |
+| `visit_rate_statistics.third_clock_q7a`, `ThirdClockQ7a` (removed) | none | e680cffd |
+| `visit_rate_scenarios.PlantedClocks.stretch` (removed) | none | e680cffd |
+| `visit_rate_scenarios.drop_before_small_movements` (removed in e680cffd) | restored, with `STRETCH_COLUMN` (the time-bin column it plants on; no model reads it) | a2982704 |
+| the stretch targets of `CLOCK_TARGETS` (removed) | none | e680cffd |
+| `visit_rate_simulation` scenario `"drop_before_small_movements"` and the stretch column of `synthetic_visit_rows` (removed in e680cffd) | restored, last in both kinds' lists | a2982704 |
+| `tests/analysis/replay_models/rate/test_visit_rate.py::test_third_clock_rule`, `::test_third_clock_rule_at_its_boundary`, `::test_third_clock_rule_counts_units`; `test_visit_rate_statistics.py::test_q7a_with_and_without_the_third_clock`; `test_visit_rate_scenarios.py::test_a_stretch_curve_enters_the_rate` (removed) | none | e680cffd |

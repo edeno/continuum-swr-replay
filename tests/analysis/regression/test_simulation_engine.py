@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace
 from functools import partial
 from pathlib import Path
 
@@ -1109,3 +1110,45 @@ if __name__ == "__main__":
         + "\n"
     )
     print(f"wrote {FIXTURE}", file=sys.stderr)
+
+
+#: The unit in which the hook below says ``rise`` lacks support.
+_UNSUPPORTED = ("animal0", "20260001", "02_r1")
+
+
+def _rise_unsupported_in_first(record, sessions) -> dict[str, bool]:
+    """A model's support hook (the record of a unit, the rows of its
+    sessions): ``rise`` lacks support in one session, ``reward`` has it in
+    every one."""
+    assert all(len(rows) for rows in sessions.values())
+    return {"reward": True, "rise": _UNSUPPORTED not in sessions}
+
+
+def test_a_model_support_hook_marks_units_without_a_value(rate_sessions_cohort) -> None:
+    """A model may say, from a unit's record and rows, which estimands have
+    support there (the rate model's window rule): a unit without support has
+    no value for that estimand, for the cause ``support``, in the units table
+    and in the summary; the other estimand is not touched; without the hook
+    nothing changes."""
+    sessions = dict(rate_sessions_cohort)
+    model = rate_model(sessions)
+    scenario = OutsideScenario("flat", _fixed_rate)
+    plain = engine.run(_simulation(model, sessions, [scenario]))
+    hooked = engine.run(
+        _simulation(
+            replace(model, support=_rise_unsupported_in_first), sessions, [scenario]
+        )
+    )
+    rise = hooked.summary.set_index("estimand").loc["rise"]
+    assert rise["without_value_support"] == pytest.approx(1 / len(sessions))
+    assert rise["share_without_value"] == pytest.approx(1 / len(sessions))
+    first = _UNSUPPORTED
+    units = hooked.sessions.query("estimand == 'rise'").set_index(
+        ["animal", "session_date", "epoch"]
+    )
+    assert set(units.loc[[first], "without_value"]) == {"support"}
+    assert units.loc[[first], "estimate"].isna().all()
+    pd.testing.assert_frame_equal(
+        plain.summary.query("estimand == 'reward'").reset_index(drop=True),
+        hooked.summary.query("estimand == 'reward'").reset_index(drop=True),
+    )

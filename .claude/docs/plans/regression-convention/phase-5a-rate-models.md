@@ -106,6 +106,7 @@ ASK-1, the ContFrag event sources; C14.
   on. Do not reuse a target from another model or from `simulate_declared_penalty.py` (simulation: the
   same target gave different penalties and biases of opposite sign in two designs). The ranges stay.
   The fit is also reported at a stiffer and a looser value (one step of the target each way; call).
+  *(Decided 2026-11-26, lead: "no just two": the rate model has two clocks; the third clock and its rule left the model.)*
   The rule for the third clock is written in the module before any fit: fit A with `f_m`; if the
   concurvity `estimate` of `f_m` or `f_u` is at least 0.8 in more than 20 % of sessions, refit without `f_m`
   and report the time-until-movement curve only from the model-free curves (Figure 4c second half). Store

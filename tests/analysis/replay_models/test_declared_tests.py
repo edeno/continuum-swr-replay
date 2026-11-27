@@ -1,4 +1,4 @@
-"""The declared family of tests: twelve estimands, each for SWR, No SWR and their difference."""
+"""The declared family of tests: thirteen estimands, each for SWR, No SWR and their difference."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from continuum_swr_replay.analysis.replay_models import declared_tests as dt
 SETTLED_IDS = {
     "Q1",
     "Q2",
+    "Q2-onset",
     "Q3a",
     "Q3b",
     "Q4a",
@@ -35,7 +36,11 @@ def test_list_is_unique_and_complete() -> None:
         assert e.question and e.description and e.model
         assert e.scale in ("log rate ratio", "log share ratio")
         assert isinstance(
-            e.contrast, dt.CurveContrast | dt.SDChangeContrast | dt.CoefficientContrast
+            e.contrast,
+            dt.CurveContrast
+            | dt.SDChangeContrast
+            | dt.CoefficientContrast
+            | dt.OutcomeWindowContrast,
         )
     # Each estimand is tested for SWR, for No SWR and for their difference.
     assert dt.TESTED == ("SWR", "No SWR", "SWR minus No SWR")
@@ -48,11 +53,27 @@ def test_list_is_unique_and_complete() -> None:
 
 
 def test_estimand_looks_up_by_id() -> None:
-    assert dt.estimand("Q2").contrast == dt.CoefficientContrast(
-        plus=("last_outcome_rewarded",)
+    assert dt.estimand("Q2").contrast == dt.OutcomeWindowContrast(
+        "last_outcome_rewarded",
+        "s(time_since_visit_start_s):last_outcome_rewarded=1",
+        "s(time_since_visit_start_s):last_outcome_rewarded=0",
+        (4.0, 10.0),
     )
     with pytest.raises(KeyError, match="Q8"):
         dt.estimand("Q8")
+
+
+def test_the_reward_windows_are_declared_once() -> None:
+    """The twenty-sixth round's windows: Q2 over 4 to 10 s after arrival, the
+    onset test over 2 to 4 s; Q1 reads the arrival curve after an omission."""
+    assert dt.Q2_WINDOW_S == (4.0, 10.0)
+    assert dt.ONSET_WINDOW_S == (2.0, 4.0)
+    assert dt.estimand("Q2").contrast.window is dt.Q2_WINDOW_S
+    assert dt.estimand("Q2-onset").contrast.window is dt.ONSET_WINDOW_S
+    q1 = dt.estimand("Q1").contrast
+    assert q1.term == "s(time_since_visit_start_s):last_outcome_rewarded=0"
+    for window in (dt.Q2_WINDOW_S, dt.ONSET_WINDOW_S):
+        assert range_grid(*window).size > 1
 
 
 def test_every_curve_contrast_lies_on_the_grid() -> None:
@@ -111,6 +132,8 @@ def test_no_contrast_reads_a_baseline() -> None:
         contrast = e.contrast
         if isinstance(contrast, dt.CoefficientContrast):
             names = [*contrast.plus, *contrast.minus]
+        elif isinstance(contrast, dt.OutcomeWindowContrast):
+            names = [contrast.coefficient, contrast.plus_term, contrast.minus_term]
         else:
             names = [contrast.term]
         for name in names:

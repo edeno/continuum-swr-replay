@@ -4,14 +4,17 @@ Every number a run of this list writes is a simulation number: the counts are
 drawn from a planted rate on the model's real rows (``regression.simulation``);
 the model's real outcome is never fitted.
 
-This list fits each session alone (the engine's models at ``fit_by="session"``,
-named ``session_sd<SD>``). The decided design fits the behavior models per
-recording day and per animal (the convention's twenty-fourth round); the next
-step (plan phase 4b, task 8) gives the list its ``fit_by``.
+Each run fits the same drawn data sets at every unit of ``Config.fit_by``
+(``"session"``, ``"day"`` and ``"animal"`` by default: one model per unit and
+prior SD, named ``<fit_by>_sd<SD>``; the decided units are the day and the
+animal, the convention's twenty-fourth round, and the session is the earlier
+design, kept for comparison), in one reward form (``Config.reward_form``: the
+declared by-outcome form, or the coefficient form whose one coefficient is
+the secondary value; the engine fits only models of one design together, so
+the two forms are two runs on the same draws).
 
 ``scripts/checks/run_simulations.py --model visit_rate --config CONFIG`` runs
-it. :func:`simulation` builds one run for one kind of event and one clock
-penalty target:
+it. :func:`simulation` builds one run for one kind of event:
 
 - the rows: model A's rows of the cohort step (``visit_rate.cohort_rows``) of
   the analyzed sessions of the canonical stop and event tables, with
@@ -28,35 +31,35 @@ penalty target:
   (the only use of the real counts but the rate table);
 - the scenarios (:data:`SCENARIOS`, from ``visit_rate_scenarios``), each an
   outside scenario of the engine: its expected counts and its planted values;
-- the models: model A with the weak penalty at each prior SD of
-  :data:`PRIOR_SDS`, all fitted to the same data sets. The estimands are Q1 with the declared reference
-  window (0 to 1 s), Q1b (the same with 1 to 2 s), Q2 and Q7a;
-- the clocks' log penalties: each clock calibrated on the run's rows by
-  ``visit_rate.calibrate_log_penalty`` to the target median edf, on one data
-  set of the calibration scenario (:data:`CALIBRATION_SEED`: the constant
-  ratio on the planted curves, each session's expected total its real number
-  of events of the kind; the real counts of the bins are not used), in two
-  rounds (each clock with the others at the
-  previous round's values; the first round starts from the module's
-  provisional values). The values are kept in ``calibration_path`` so that a
-  rerun reads them. A run with no target (the quick configuration) fits at
-  the provisional values with ``allow_provisional="simulation"``.
+- the models: model A of the run's form at each unit of ``Config.fit_by``
+  and each prior SD of :data:`PRIOR_SDS`, all fitted to the same data sets.
+  The by-outcome form's estimands are the declared Q1 (reference window 0 to
+  1 s), Q2, Q2-onset and Q7a, and Q1b (Q1 against 1 to 2 s); the coefficient
+  form's is the secondary reward coefficient (``visit_rate.SECONDARY_ESTIMAND``);
+- the curves' log penalties: with ``Config.calibrate``, each curve of the
+  form (``VisitRateSettings.curves``) calibrated at each decided unit (a day
+  and an animal; the session, kept for comparison, stays at the provisional
+  per-session values), by
+  ``visit_rate.calibrate_log_penalty`` (the median edf over that unit's
+  fits) to its declared target at that unit (:data:`CLOCK_TARGETS`, the
+  author's settings from the evidence, not validated), on one data set of the
+  calibration scenario (:data:`CALIBRATION_SEED`: the constant ratio on the
+  planted curves, each session's expected total its number of events of the
+  kind; the counts of the bins are not used), in two rounds (each curve with
+  the others at the previous round's values; the first round starts from the
+  module's provisional values). The values are kept in ``calibration_path``
+  so that a rerun reads them. A run without calibration (the quick
+  configuration) fits at the provisional values.
 
-The planted values (each scenario's truth for each model):
-
-- the session level: each session's truth of the coefficient form
-  (``Planted.pooled``, the Poisson projection onto that form) reduced as the
-  estimates are, session -> recording day -> animal, the animals' mean;
-- beside them (``table``): the omission side's truth of Q2 (the time-varying
-  form's), reduced as at the session level.
-
-The later-onset scenario has Q2 NaN in every truth because Q2 here is
-the single reward coefficient and this scenario plants no constant ratio
-(only the arrival curve after an omission is delayed). Under the decided window
-form (the convention's twenty-sixth round: an arrival curve for each outcome,
-read over a window) this scenario has a real, nonzero window truth, the
-difference of the two arrival curves over the window; the next step computes
-it, this list does not.
+The planted values (each scenario's truth for each model,
+``visit_rate_scenarios.Planted.for_form``): each session's truth of the
+run's form reduced as the estimates are, session -> recording day ->
+animal, the animals' mean (``planted``); the engine adds ``planted_unit``,
+the unit model fitted to the expected counts. For the by-outcome form the
+window truths are the plain means of the planted reward effect over each
+window (in closed form for every scenario whose effect depends on the time
+since arrival only, the later onset among them); for the coefficient form,
+the projection's coefficient, NaN for the later onset (no ratio is planted).
 
 Which truths depend on the real outcome. On the real cohort, every scenario's
 planted clock curves are shaped by the stored model-free curves of the real
@@ -66,10 +69,13 @@ of "no effect" (zero) and of "constant" (:data:`LOG_RATIO`) does not depend
 on the real outcome, nor do the fading, differing, later-onset and drop
 effects. The rate table's does (:data:`TRUTH_FROM_REAL_COUNTS`): its planted
 rate is a tabulation of the rows' REAL counts by outcome and both clocks
-(:func:`_rate_table`), and its "planted" Q1, Q2 and Q7a are an unpenalized
-Poisson projection of the model's coefficient form onto that tabulation
-(``visit_rate_scenarios.rate_table_truth``): in substance the real data's
-pooled model-free values, not a chosen truth. They are not a result and are
+(:func:`_rate_table`), and its "planted" values are unpenalized Poisson
+projections onto that tabulation (``visit_rate_scenarios.rate_table_truth``):
+for the by-outcome form, Q1, Q2, Q2-onset and Q7a from the projection with an
+arrival step for each outcome (the by-outcome projection); for the
+coefficient form, the reward coefficient of the projection with one arrival
+step and the coefficient. In substance they are the real data's pooled
+model-free values, not a chosen truth. They are not a result and are
 not to be quoted; the table carries ``truth_from_real_counts`` on its rows
 and the run's ``attrs`` the same note.
 
@@ -114,16 +120,19 @@ from continuum_swr_replay.analysis.regression.terms import (
 from continuum_swr_replay.analysis.shared_statistics import animal_day_session_values
 from continuum_swr_replay.runs.threads import pool_context
 
+from ..fit_by import BEHAVIOR_FIT_BY
 from ..visit_design import REWARD_LAG_COLUMNS
 from . import visit_rate as vr
 from . import visit_rate_scenarios as sc
 
 __all__ = [
     "CALIBRATION_SEED",
+    "CLOCK_TARGETS",
     "DATA_SEED",
+    "FIT_BYS",
     "PRIOR_SDS",
     "SCENARIOS",
-    "TARGETS",
+    "VALIDATION_COHORT",
     "TRUTH_FROM_REAL_COUNTS",
     "Config",
     "calibrate_clocks",
@@ -131,6 +140,8 @@ __all__ = [
     "shaped_clocks",
     "simulation",
     "smoothed_log_rate",
+    "estimand_support",
+    "model_name",
     "spread_sessions",
     "table",
 ]
@@ -139,8 +150,41 @@ __all__ = [
 #: then the sensitivity pair (``visit_rate.WEAK_PRIOR_SD``,
 #: ``WEAK_PRIOR_SD_SENSITIVITY``), that is (2, 1, 4).
 PRIOR_SDS: tuple[float, ...] = (vr.WEAK_PRIOR_SD, *vr.WEAK_PRIOR_SD_SENSITIVITY)
-#: The clocks' target median edfs.
-TARGETS: tuple[float, ...] = (6.0, 10.0)
+#: The units each run fits the same data sets at (the decided day and animal,
+#: and the session for comparison).
+FIT_BYS: tuple[str, ...] = ("session", "day", "animal")
+#: The target median edf of each curve at each decided unit's calibration:
+#: DECLARED SETTINGS OF THE AUTHOR, NOT validated: the evidence's suggestion,
+#: about 15 effective parameters for each arrival curve and 10 or more for the
+#: leaving curve at the animal unit (``design_d_trial/rate/followup/REPORT.md``,
+#: section 6; the twenty-sixth round), and 10 per curve at the day (the fixed
+#: value that section ran there). On :data:`VALIDATION_COHORT` the search
+#: reaches every target (measured 2026-11-26). The calibration still stops
+#: when a unit's first fit fails at a trial penalty
+#: (``docs/known_issues/calibration_stops_at_a_failed_fit.md``). With the
+#: arrival curves centered on Q2's window (``visit_rate.ARRIVAL_CENTER_S``),
+#: in a unit whose rows after an omission do not reach the window about 0.4 to
+#: 0.9 edf moves into the omitted curve's term (the review's simulation
+#: numbers on synthetic rows: 4.70 against 4.09 with the curves centered on
+#: the rows), so a target for that curve at the day unit means a slightly
+#: stiffer penalty than the same number meant with row centering; in units
+#: with support the edfs are equal to 3 decimals. The declared-penalty step on
+#: the real rows must calibrate the day unit with this in view. The
+#: coefficient form's shared arrival curve takes the arrival curves' target.
+CLOCK_TARGETS: dict[str, dict[str, float]] = {
+    "day": {
+        vr.OMITTED_ARRIVAL_TERM: 10.0,
+        vr.REWARDED_ARRIVAL_TERM: 10.0,
+        vr.ARRIVAL: 10.0,
+        vr.LEAVING: 10.0,
+    },
+    "animal": {
+        vr.OMITTED_ARRIVAL_TERM: 15.0,
+        vr.REWARDED_ARRIVAL_TERM: 15.0,
+        vr.ARRIVAL: 15.0,
+        vr.LEAVING: 10.0,
+    },
+}
 #: The run's seed (``regression.simulation.data_seed``).
 DATA_SEED = 20261124
 #: The seed of the calibration data set.
@@ -194,9 +238,19 @@ SCENARIOS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-#: The quick configuration's synthetic cohort: animals, sessions per animal,
-#: visits per session and events per session.
-QUICK_COHORT = (5, 2, 40, 150.0)
+#: The quick configuration's synthetic cohort: animals, days per animal,
+#: sessions per day, visits per session, events per session, the range of a
+#: visit's length (s) and that after an omission (None: the same).
+QUICK_COHORT = (5, 2, 1, 40, 150.0, (1.5, 12.0), None)
+#: The first validation's synthetic cohort (the author's sizes): five
+#: animals of four days of two sessions, 100 visits and 200 expected events
+#: a session; visits after an omission shorter (0.5 to 12 s against 1 to
+#: 14 s), so that the windows' omission side comes from the visits that last
+#: into them: about 220 visits after an omission reach 4 s in an animal (the
+#: real animals have 146 to 429 in 4 to 10 s; the twenty-sixth round) and
+#: about 55 reach 10 s, so that no part of Q2's window lies beyond every
+#: visit after an omission.
+VALIDATION_COHORT = (5, 4, 2, 100, 200.0, (1.0, 14.0), (0.5, 12.0))
 #: The quick configuration's planted curves: a rise after arrival and a drop
 #: before leaving.
 QUICK_CLOCKS = sc.PlantedClocks(
@@ -216,30 +270,56 @@ class Config:
     Attributes
     ----------
     kind : {"SWR", "No SWR"}
-    target_edf : float or None
-        The clocks' target median edf; None fits at the provisional values.
+    reward_form : {"by_outcome", "coefficient"}
+        The form of the run's models (``visit_rate.REWARD_FORMS``).
+    fit_by : tuple of str
+        The units of the fit, one model each (:data:`FIT_BYS`).
+    calibrate : bool
+        Calibrate each curve at each decided unit (a day, an animal) to
+        :data:`CLOCK_TARGETS`; False fits at the provisional values. The
+        session always fits at them.
     sessions_per_animal : int or None
         Sessions of each animal (:func:`spread_sessions`); None takes all.
     n_data_sets, n_draws : int
     prior_sds : tuple of float
-        The weak penalty's prior SDs of the session-level models.
+        The weak penalty's prior SDs, one model each at each unit.
     calibration_path : str or None
         Where the calibrated log penalties are kept (read when it exists).
-    quick : bool
-        The synthetic cohort (:data:`QUICK_COHORT`) and :data:`QUICK_CLOCKS`.
+    synthetic : tuple or None
+        A synthetic cohort of this shape (as :data:`QUICK_COHORT`, for
+        example :data:`VALIDATION_COHORT`) and :data:`QUICK_CLOCKS` in place
+        of the real rows; no table is read.
     """
 
     kind: str = "SWR"
-    target_edf: float | None = None
+    reward_form: str = "by_outcome"
+    fit_by: tuple[str, ...] = FIT_BYS
+    calibrate: bool = False
     sessions_per_animal: int | None = None
     n_data_sets: int = 20
     n_draws: int = 1000
     prior_sds: tuple[float, ...] = PRIOR_SDS
     calibration_path: str | None = None
-    quick: bool = False
+    synthetic: tuple | None = None
+
+    def __post_init__(self) -> None:
+        if self.reward_form not in vr.REWARD_FORMS:
+            raise ValueError(
+                f"reward_form {self.reward_form!r} not in {vr.REWARD_FORMS}"
+            )
+        object.__setattr__(self, "fit_by", tuple(self.fit_by))
+        object.__setattr__(self, "prior_sds", tuple(self.prior_sds))
+        if self.synthetic is not None:
+            object.__setattr__(self, "synthetic", tuple(self.synthetic))
 
 
-QUICK = Config(n_data_sets=2, n_draws=200, prior_sds=(2.0,), quick=True)
+QUICK = Config(
+    n_data_sets=2,
+    n_draws=200,
+    prior_sds=(2.0,),
+    fit_by=("session",),
+    synthetic=QUICK_COHORT,
+)
 
 
 # --- The rows --------------------------------------------------------------------
@@ -260,7 +340,8 @@ def synthetic_visit_rows(
 
     Visits of random length, each one or two immobile stretches (with a 0.3 s
     movement between them), bins of ``bin_s`` from each stretch's start, the
-    three clocks at the bin center, and an outcome history with ten known
+    model's two clocks and the time until the end of the stretch (a column
+    of the time-bin table that no model reads) at the bin center, and an outcome history with ten known
     outcomes in every bin. The counts are zero.
 
     Parameters
@@ -274,8 +355,8 @@ def synthetic_visit_rows(
     p_reward : float
         The chance that a visit is rewarded.
     two_stretch_share : float
-        The share of visits with two stretches; 0 makes the stretch clock the
-        leaving clock in every bin.
+        The share of visits with two stretches (a visit shorter than 0.9 s
+        has one).
     length_s : tuple of float
         The range of the visits' lengths (uniform).
     omission_length_s : tuple of float, optional
@@ -295,7 +376,8 @@ def synthetic_visit_rows(
         history = outcomes[visit : visit + len(REWARD_LAG_COLUMNS)][::-1]
         omitted = history[0] == 0.0 and omission_length_s is not None
         length = rng.uniform(*(omission_length_s if omitted else length_s))
-        if rng.random() < two_stretch_share:
+        # A visit too short for two stretches of 0.3 s and the gap has one.
+        if rng.random() < two_stretch_share and length > 2 * 0.3 + gap_s:
             cut = rng.uniform(0.3, length - gap_s - 0.3)
             stretches = [(0.0, cut), (cut + gap_s, length)]
         else:
@@ -314,7 +396,7 @@ def synthetic_visit_rows(
                     "count": 0.0,
                     vr.ARRIVAL: center,
                     vr.LEAVING: length - center,
-                    vr.STRETCH: end - center,
+                    sc.STRETCH_COLUMN: end - center,
                 }
             )
             for column, outcome in zip(REWARD_LAG_COLUMNS, history, strict=True):
@@ -329,22 +411,30 @@ def synthetic_visit_rows(
     return rows[["animal", "session_date", "epoch", *rows.columns[3:]]]
 
 
-def _synthetic_cohort(kind: str) -> dict[SessionKey, vr.CohortRows]:
-    """The quick configuration's cohort (:data:`QUICK_COHORT`); each
-    session's counts are drawn once from :data:`QUICK_CLOCKS` with a ratio of
-    1.5, so that the rate table and the totals have counts to read."""
-    n_animals, n_sessions, n_visits, total = QUICK_COHORT
+def _synthetic_cohort(kind: str, shape: tuple) -> dict[SessionKey, vr.CohortRows]:
+    """A synthetic cohort of ``shape`` (:data:`QUICK_COHORT`); each session's
+    counts are drawn once from :data:`QUICK_CLOCKS` with a ratio of 1.5, so
+    that the rate table and the totals have counts to read."""
+    n_animals, n_days, n_per_day, n_visits, total, length_s, omission_s = shape
     rng = np.random.default_rng(0)
     out = {}
     for a in range(n_animals):
-        for e in range(n_sessions):
-            key = (f"animal{a}", f"2026{e + 1:04d}", "02_r1")
-            rows = synthetic_visit_rows(key, n_visits=n_visits, seed=n_sessions * a + e)
-            truth = sc.constant_ratio(
-                rows, QUICK_CLOCKS, log_ratio=float(np.log(1.5)), total=total
-            )
-            rows["count"] = rng.poisson(truth.expected).astype(float)
-            out[key] = vr.CohortRows(kind, {"A": rows, "D": rows.iloc[:0]}, {})
+        for d in range(n_days):
+            for e in range(n_per_day):
+                key = (f"animal{a}", f"2026{d + 1:04d}", f"{2 * e + 2:02d}_r{e + 1}")
+                rows = synthetic_visit_rows(
+                    key,
+                    n_visits=n_visits,
+                    seed=(n_days * a + d) * n_per_day + e,
+                    length_s=tuple(length_s),
+                    omission_length_s=None if omission_s is None else tuple(omission_s),
+                )
+                truth = sc.constant_ratio(
+                    rows, QUICK_CLOCKS, log_ratio=float(np.log(1.5)), total=total
+                )
+                rows["count"] = rng.poisson(truth.expected).astype(float)
+                rows_d, counts = vr.model_d_rows(rows)
+                out[key] = vr.CohortRows(kind, {"A": rows, "D": rows_d}, counts)
     return out
 
 
@@ -607,11 +697,8 @@ def _session_planted(
         )
         out[name] = {
             "expected": planted.expected,
-            "pooled": {**planted.pooled, "Q1b": later.pooled["Q1"]},
-            "omission_side": {
-                **planted.omission_side,
-                "Q1b": later.omission_side["Q1"],
-            },
+            "pooled": dict(planted.pooled),
+            "by_outcome": {**planted.by_outcome, "Q1b": later.by_outcome["Q1"]},
         }
     return out
 
@@ -657,38 +744,82 @@ def _planted_of(model: Model, *, values: Mapping[str, float]) -> float:
 
 
 def _estimands(design, settings: vr.VisitRateSettings) -> dict[str, np.ndarray]:
-    """Q1 (declared window), Q1b (1 to 2 s), Q2 (at the session level) and
-    Q7a on a design."""
+    """The estimands of the run's form on a design: the by-outcome form's
+    declared Q1 (reference window 0 to 1 s), Q2, Q2-onset and Q7a, and Q1b
+    (Q1 against 1 to 2 s); the coefficient form's secondary reward
+    coefficient."""
     c = vr.declared_contrasts(design, replace(settings, q1_reference_s=(0.0, 1.0)))
+    if settings.reward_form == "coefficient":
+        return c
     later = vr.declared_contrasts(design, replace(settings, q1_reference_s=(1.0, 2.0)))
-    out = {"Q1": c["Q1"], "Q1b": later["Q1"], "Q7a": c["Q7a"]}
-    if "Q2" in c:
-        out["Q2"] = c["Q2"]
-    return out
+    return {**c, "Q1b": later["Q1"]}
+
+
+def estimand_support(
+    record, sessions: Mapping[SessionKey, pd.DataFrame], *, settings
+) -> dict[str, bool]:
+    """The window support rule (``visit_rate.window_support``) of the
+    by-outcome form's estimands in one unit, Q1b with Q1's reads at the 1 to
+    2 s reference: the engine's ``Model.support``, so that the simulation
+    gives no value where the statistics give none."""
+    reads = dict(vr.window_reads(settings))
+    reads["Q1b"] = vr.window_reads(replace(settings, q1_reference_s=(1.0, 2.0)))["Q1"]
+    found = vr.window_support(list(sessions.values()), settings, reads)
+    return {name: entry["supported"] for name, entry in found.items()}
+
+
+def _settings(
+    config: Config,
+    fit_by: str,
+    calibrated: Mapping[tuple[str, str], vr.CalibratedPenalty] | None = None,
+    **changes,
+) -> vr.VisitRateSettings:
+    """The model settings of the run at one unit."""
+    return vr.VisitRateSettings(
+        reward_form=config.reward_form,
+        fit_by=fit_by,
+        calibrated_penalties=calibrated,
+        **changes,
+    )
+
+
+def model_name(fit_by: str, prior_sd: float) -> str:
+    """A model's name in the tables: its unit and prior SD."""
+    return f"{fit_by}_sd{prior_sd:g}"
 
 
 def _models(
     kind: str,
     pooled: pd.DataFrame,
     config: Config,
-    calibrated: Mapping[tuple[str, str], vr.CalibratedPenalty] | None,
+    calibrated: Mapping[str, Mapping[tuple[str, str], vr.CalibratedPenalty] | None],
 ) -> list[Model]:
-    """The session-level models, one per prior SD."""
-    base = vr.VisitRateSettings(calibrated_penalties=calibrated)
+    """The models of the run: one per unit of ``config.fit_by`` and prior
+    SD, each at its unit's calibrated penalties (``calibrated``, by unit;
+    None for the provisional values)."""
     models = []
-    for sd in config.prior_sds:
-        settings = replace(base, weak_prior_sd=sd)
-        design = vr.build_visit_rate_design("A", kind, pooled, settings)
-        models.append(
-            Model(
-                f"session_sd{sd:g}",
-                design,
-                Poisson(),
-                vr.RESPONSE,
-                vr.UNIT,
-                _estimands(design, settings),
+    for fit_by in config.fit_by:
+        for sd in config.prior_sds:
+            settings = _settings(
+                config, fit_by, calibrated.get(fit_by), weak_prior_sd=sd
             )
-        )
+            design = vr.build_visit_rate_design("A", kind, pooled, settings)
+            models.append(
+                Model(
+                    model_name(fit_by, sd),
+                    design,
+                    Poisson(),
+                    vr.RESPONSE,
+                    vr.UNIT,
+                    _estimands(design, settings),
+                    fit_by=fit_by,
+                    support=(
+                        partial(estimand_support, settings=settings)
+                        if config.reward_form == "by_outcome"
+                        else None
+                    ),
+                )
+            )
     return models
 
 
@@ -700,39 +831,52 @@ def _calibrate_one(
     kind: str,
     curve: str,
     target_edf: float,
-    log_penalties: Mapping[str, float],
-) -> tuple[float, float]:
-    """One clock's calibrated log penalty and median edf, the others at
-    ``log_penalties``."""
+    settings: vr.VisitRateSettings,
+) -> tuple[float, float, int]:
+    """One curve's calibrated log penalty, median edf and units used, the
+    others at ``settings.log_penalties``."""
     found = vr.calibrate_log_penalty(
         cohort,
         model="A",
         kind=kind,
         curve=curve,
         target_edf=target_edf,
-        settings=vr.VisitRateSettings(log_penalties=dict(log_penalties)),
+        settings=settings,
     )
-    return float(found.log_penalty), float(found.median_edf)
+    return float(found.log_penalty), float(found.median_edf), int(found.n_sessions_used)
 
 
 def calibrate_clocks(
     cohort: Mapping[SessionKey, vr.CohortRows],
     kind: str,
-    target_edf: float,
+    settings: vr.VisitRateSettings,
     clocks: sc.PlantedClocks,
     record: Mapping[str, object],
     workers: int = 1,
+    targets: Mapping[str, float] | None = None,
 ) -> dict[tuple[str, str], vr.CalibratedPenalty]:
-    """Each clock's log penalty at the target median edf, on one data set of
-    the calibration scenario (the constant ratio of the kind, drawn with
-    :data:`CALIBRATION_SEED`), in two rounds (module docstring).
+    """Each curve's log penalty at its target median edf over the units of
+    ``settings.fit_by``, on one data set of the calibration scenario (the
+    constant ratio of the kind, drawn with :data:`CALIBRATION_SEED`), in two
+    rounds (module docstring).
+
+    Parameters
+    ----------
+    settings : VisitRateSettings
+        The form and unit of the fit; each curve of
+        ``settings.curves("A")`` is calibrated.
+    targets : mapping of str to float, optional
+        Curve -> its target median edf; None reads the unit's
+        :data:`CLOCK_TARGETS`.
 
     Returns
     -------
-    dict of (kind, clock) to CalibratedPenalty
-        Each with its record: ``record`` (the rows), the calibration
-        scenario and seed, and the median edf of each round.
+    dict of (kind, curve) to CalibratedPenalty
+        Each with its record: ``record`` (the rows), the unit, the
+        calibration scenario and seed, and the log penalty, median edf and
+        units used of each round.
     """
+    targets = CLOCK_TARGETS[settings.fit_by] if targets is None else targets
     rng = np.random.default_rng(CALIBRATION_SEED)
     drawn = {}
     for key, rows in cohort.items():
@@ -741,13 +885,20 @@ def calibrate_clocks(
             a, clocks, log_ratio=LOG_RATIO[kind], total=float(a[vr.RESPONSE].sum())
         )
         drawn[key] = replace(
-            rows, rows={"A": a.assign(**{vr.RESPONSE: rng.poisson(planted.expected)})}
+            rows,
+            rows={
+                "A": a.assign(**{vr.RESPONSE: rng.poisson(planted.expected)}),
+                "D": rows.rows["D"],
+            },
         )
-    curves = vr.VisitRateSettings().clocks()
-    values = {c: vr.CLOCK_LOG_PENALTIES[kind]["declared"][c] for c in curves}
+    curves = settings.curves("A")
+    values = {c: settings.log_penalty(kind, c) for c in curves}
     rounds = []
     for _ in range(2):
-        tasks = [(drawn, kind, c, target_edf, values) for c in curves]
+        tasks = [
+            (drawn, kind, c, targets[c], replace(settings, log_penalties=dict(values)))
+            for c in curves
+        ]
         if workers > 1:
             with pool_context().Pool(min(workers, len(tasks))) as pool:
                 found = pool.starmap(_calibrate_one, tasks)
@@ -756,16 +907,18 @@ def calibrate_clocks(
         values = {c: f[0] for c, f in zip(curves, found, strict=True)}
         rounds.append(
             {
-                c: {"log_penalty": f[0], "median_edf": f[1]}
+                c: {"log_penalty": f[0], "median_edf": f[1], "n_units_used": f[2]}
                 for c, f in zip(curves, found, strict=True)
             }
         )
     return {
         (kind, c): vr.CalibratedPenalty(
             values[c],
-            target_edf,
+            targets[c],
             {
                 **record,
+                "fit_by": settings.fit_by,
+                "reward_form": settings.reward_form,
                 "calibration_scenario": f"constant_ratio log {np.exp(LOG_RATIO[kind]):g}",
                 "calibration_seed": CALIBRATION_SEED,
                 "rounds": rounds,
@@ -777,39 +930,59 @@ def calibrate_clocks(
 
 def _calibrated(
     cohort, kind: str, config: Config, clocks, record, workers: int
-) -> dict[tuple[str, str], vr.CalibratedPenalty] | None:
-    """The calibrated penalties of the run: read from ``calibration_path``
-    when it exists, else calibrated and written there; None without a target."""
-    if config.target_edf is None:
-        return None
+) -> dict[str, dict[tuple[str, str], vr.CalibratedPenalty] | None]:
+    """The calibrated penalties of the run at each unit of ``config.fit_by``
+    that is a unit of ``fit_by.BEHAVIOR_FIT_BY`` (a day, an animal): read from
+    ``calibration_path`` when it exists, else calibrated and written there.
+    None (the provisional values) at the session, the earlier design kept for
+    comparison, and at every unit without ``config.calibrate``: the targets
+    are a unit's, and a session's fit at a smooth of about 15 effective
+    parameters ends at the step limit on a thin session (the first
+    validation's synthetic cohort, 2026-11-26), which stops the
+    calibration."""
+    if not config.calibrate:
+        return dict.fromkeys(config.fit_by)
+    calibrated_units = [u for u in config.fit_by if u in BEHAVIOR_FIT_BY]
     path = Path(config.calibration_path) if config.calibration_path else None
     if path is not None and path.exists():
         stored = json.loads(path.read_text())
-        return {
-            (kind, c): vr.CalibratedPenalty(
-                v["log_penalty"], v["target_edf"], v["rows"]
-            )
-            for c, v in stored.items()
+        found = {
+            fit_by: {
+                (kind, c): vr.CalibratedPenalty(
+                    v["log_penalty"], v["target_edf"], v["rows"]
+                )
+                for c, v in stored[fit_by].items()
+            }
+            for fit_by in calibrated_units
         }
-    found = calibrate_clocks(cohort, kind, config.target_edf, clocks, record, workers)
+        return dict.fromkeys(config.fit_by) | found
+    found = {
+        fit_by: calibrate_clocks(
+            cohort, kind, _settings(config, fit_by), clocks, record, workers
+        )
+        for fit_by in calibrated_units
+    }
     if path is not None:
         from continuum_swr_replay.runs.io import json_ready
         from continuum_swr_replay.tables.io import write_atomically
 
         text = json.dumps(
             {
-                c: {
-                    "log_penalty": p.log_penalty,
-                    "target_edf": p.target_edf,
-                    "rows": json_ready(dict(p.rows)),
+                fit_by: {
+                    c: {
+                        "log_penalty": p.log_penalty,
+                        "target_edf": p.target_edf,
+                        "rows": json_ready(dict(p.rows)),
+                    }
+                    for (_, c), p in penalties.items()
                 }
-                for (_, c), p in found.items()
+                for fit_by, penalties in found.items()
             },
             indent=1,
         )
         path.parent.mkdir(parents=True, exist_ok=True)
         write_atomically(path, lambda tmp: Path(tmp).write_text(text))
-    return found
+    return dict.fromkeys(config.fit_by) | found
 
 
 # --- The run ---------------------------------------------------------------------
@@ -850,8 +1023,8 @@ def simulation(
     Parameters
     ----------
     quick : bool
-        The quick configuration (:data:`QUICK`), whatever ``config`` says of
-        the cohort.
+        The quick configuration (:data:`QUICK`) with ``config``'s kind and
+        reward form, whatever else ``config`` says.
     workers : int
         Processes for building the rows, the planted values and the
         calibration.
@@ -866,11 +1039,12 @@ def simulation(
     """
     config = Config(**dict(config or {}))
     if quick:
-        config = replace(QUICK, kind=config.kind)
+        config = replace(QUICK, kind=config.kind, reward_form=config.reward_form)
     kind = config.kind
     names = SCENARIOS[kind]
-    if config.quick:
-        cohort, record = _synthetic_cohort(kind), {"rows": "synthetic"}
+    if config.synthetic is not None:
+        cohort = _synthetic_cohort(kind, config.synthetic)
+        record = {"rows": "synthetic", "shape": list(config.synthetic)}
         clocks = QUICK_CLOCKS
     else:
         from continuum_swr_replay.paths import replay_content_dir
@@ -896,7 +1070,7 @@ def simulation(
         (rows, names, clocks, kind, totals[key], log_ratios, table_rates)
         for key, rows in sessions.items()
     ]
-    if workers > 1 and not config.quick:
+    if workers > 1 and config.synthetic is None:
         with pool_context().Pool(workers) as pool:
             planted_list = pool.map(_planted_task, tasks, chunksize=1)
     else:
@@ -910,26 +1084,21 @@ def simulation(
         rows_out[key] = rows.assign(
             **{f"expected_{n}": planted[key][n]["expected"] for n in names}
         )
+    form = sc.TRUTH_OF_FORM[config.reward_form]
     scenarios, truths = [], {}
     for name in names:
         by_session = {key: planted[key][name] for key in sessions}
         truth = {
-            "session": {
-                e: _balanced({k: v["pooled"][e] for k, v in by_session.items()})
-                for e in ("Q1", "Q1b", "Q2", "Q7a")
-            },
-            "omission_side": {
-                e: _balanced({k: v["omission_side"][e] for k, v in by_session.items()})
-                for e in ("Q1", "Q1b", "Q2", "Q7a")
-            },
+            form: {
+                e: _balanced({k: v[form][e] for k, v in by_session.items()})
+                for e in next(iter(by_session.values()))[form]
+            }
+            for form in ("by_outcome", "pooled")
         }
         truths[name] = truth
         planted_values = {
-            e: partial(
-                _planted_of,
-                values={m.name: truth["session"][e] for m in models},
-            )
-            for e in ("Q1", "Q1b", "Q2", "Q7a")
+            e: partial(_planted_of, values={m.name: truth[form][e] for m in models})
+            for e in truth[form]
         }
         scenarios.append(
             OutsideScenario(
@@ -943,13 +1112,24 @@ def simulation(
         "config": {
             **dict(config.__dict__),
             "prior_sds": list(config.prior_sds),
+            "fit_by": list(config.fit_by),
+            "synthetic": None if config.synthetic is None else list(config.synthetic),
         },
         "rows": record,
         "calibration": {
-            c: {"log_penalty": p.log_penalty, "target_edf": p.target_edf}
-            for (_, c), p in (calibrated or {}).items()
+            fit_by: {
+                c: {
+                    "log_penalty": p.log_penalty,
+                    "target_edf": p.target_edf,
+                    "median_edf": p.rows["rounds"][-1][c]["median_edf"],
+                    "n_units_used": p.rows["rounds"][-1][c]["n_units_used"],
+                }
+                for (_, c), p in penalties.items()
+            }
+            for fit_by, penalties in calibrated.items()
+            if penalties is not None
         },
-        "allow_provisional": None if calibrated else "simulation",
+        "allow_provisional": None if config.calibrate else "simulation",
         "truths": truths,
         "truth_from_real_counts": {
             "scenarios": [n for n in names if n in TRUTH_FROM_REAL_COUNTS],
@@ -982,30 +1162,29 @@ def simulation(
 
 
 def table(result: SimulationResult, simulation: Simulation) -> pd.DataFrame:
-    """The engine's summary with the run's kind, target and each model's
-    prior SD, and Q2's truths beside the planted value:
-    ``truth_session`` (the pooled truth) and
-    ``truth_omission_side`` (the time-varying form's), and
-    ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`).
-
-    The later-onset scenario's Q2 truths are NaN: Q2 here is the single reward
-    coefficient and that scenario plants no constant ratio. Under the decided
-    window form (twenty-sixth round) it has a real, nonzero window truth, the
-    difference of the two arrival curves over the window, which the next step
-    computes (module docstring)."""
+    """The engine's summary with the run's kind, reward form and calibration,
+    each model's prior SD (its unit is the engine's ``fit_by``), the truths of
+    both forms beside the planted value (``truth_by_outcome``,
+    ``truth_pooled``; NaN where a form has no such estimand),
+    ``truth_from_real_counts`` (:data:`TRUTH_FROM_REAL_COUNTS`) and
+    ``declared_test`` (``visit_rate.is_declared_test``: the window tests are
+    declared at the animal unit only; their session and day rows are kept as
+    a check)."""
     config = simulation.attrs["config"]
     truths = simulation.attrs["truths"]
     out = result.summary.copy()
     out.insert(0, "kind", config["kind"])
-    out.insert(1, "target_edf", config["target_edf"])
-    out["prior_sd"] = [
-        float(m.removeprefix("session_sd")) if m.startswith("session_sd") else np.nan
-        for m in out["model"]
-    ]
+    out.insert(1, "reward_form", config["reward_form"])
+    out.insert(2, "calibrate", config["calibrate"])
+    out["prior_sd"] = [float(m.rpartition("_sd")[2]) for m in out["model"]]
     out["truth_from_real_counts"] = out["scenario"].isin(TRUTH_FROM_REAL_COUNTS)
-    for name in ("session", "omission_side"):
+    out["declared_test"] = [
+        vr.is_declared_test(e, f)
+        for e, f in zip(out["estimand"], out["fit_by"], strict=True)
+    ]
+    for name in ("by_outcome", "pooled"):
         out[f"truth_{name}"] = [
-            truths[s][name][e]
+            truths[s][name].get(e, np.nan)
             for s, e in zip(out["scenario"], out["estimand"], strict=True)
         ]
     return out

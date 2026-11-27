@@ -347,7 +347,7 @@ Decided since, and open now: [Status](#status) (the design's seventeenth to twen
   dropped single precision (2026-11-23), so the check is GPU float64 against CPU float64 (see above).
 - Section 5 has "a double-precision NumPy reference and a JAX version for batches"; the twentieth round
   replaces it by one JAX fitter for every family.
-- Figure 4's panel c asks for the rate against "time until a small movement", but the third clock is kept
+- *(Decided 2026-11-26, lead: "no just two": the rate model has two clocks; the third clock and its rule left the model.)* Figure 4's panel c asks for the rate against "time until a small movement", but the third clock is kept
   only if the collinearity rule separates it; panel c's second half depends on Phase 5a's result.
 - The design's section 4.3 chooses each smooth's strength by REML shared by all sessions. The fourteenth
   round keeps one fit per session, and the simulation shows the REML choice makes a per-session curve a
